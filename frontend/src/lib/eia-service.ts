@@ -1,5 +1,5 @@
 const EIA_BASE_URL = "https://api.eia.gov/v2/petroleum/pri/gnd/data/";
-const FETCH_TIMEOUT_MS = 8000; // 8 second timeout for EIA API calls
+const FETCH_TIMEOUT_MS = 15000; // 15 second timeout for EIA API calls
 
 const REGION_MAP: Record<string, string> = {
   US: "NUS", "East Coast": "R10", Midwest: "R20", "Gulf Coast": "R30",
@@ -60,36 +60,41 @@ export async function fetchPrices(
     length: "5000",
   });
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const res = await fetch(`${EIA_BASE_URL}?${params}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+      const res = await fetch(`${EIA_BASE_URL}?${params}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      console.error(`[EIA] API returned ${res.status}: ${res.statusText}`);
+      if (!res.ok) {
+        console.error(`[EIA] API returned ${res.status}: ${res.statusText}`);
+        if (attempt === 0) continue; // retry once
+        return [];
+      }
+      const data = await res.json();
+
+      const prices: PricePoint[] = [];
+      for (const row of data?.response?.data || []) {
+        if (row.value != null) {
+          prices.push({ period: row.period, value: Number(row.value) });
+        }
+      }
+      if (prices.length === 0) {
+        console.warn(`[EIA] No price data returned for ${fuelType}/${region}`);
+      }
+      return prices;
+    } catch (err) {
+      console.error(`[EIA] Fetch error (attempt ${attempt + 1}):`, err);
+      if (attempt === 0) continue; // retry once on timeout
       return [];
     }
-    const data = await res.json();
-
-    const prices: PricePoint[] = [];
-    for (const row of data?.response?.data || []) {
-      if (row.value != null) {
-        prices.push({ period: row.period, value: Number(row.value) });
-      }
-    }
-    if (prices.length === 0) {
-      console.warn(`[EIA] No price data returned for ${fuelType}/${region}`);
-    }
-    return prices;
-  } catch (err) {
-    console.error("[EIA] Fetch error:", err);
-    return [];
   }
+  return [];
 }
 
 export async function getCurrentPrice(

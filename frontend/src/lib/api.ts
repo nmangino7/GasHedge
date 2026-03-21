@@ -6,14 +6,16 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
+async function fetchJson<T>(path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const timeoutMs = options?.timeoutMs || 60000;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const { timeoutMs: _, ...fetchOpts } = options || {};
     const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "Content-Type": "application/json", ...options?.headers },
-      ...options,
+      headers: { "Content-Type": "application/json", ...fetchOpts?.headers },
+      ...fetchOpts,
       signal: controller.signal,
     });
 
@@ -32,7 +34,7 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     return res.json();
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("Request timed out after 30 seconds. The server may be overloaded.");
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds. The server may be overloaded.`);
     }
     throw err;
   } finally {
@@ -90,6 +92,15 @@ export const hedgingApi = {
       total_unhedged_cost: number; total_hedged_cost: number;
       total_savings: number; savings_pct: number;
     }>(`/hedging/backtest/${companyId}?years=${years}&hedge_ratio=${hedgeRatio}&product_ticker=${ticker}`),
+  allStrategies: (companyId: number, hedgeRatio = 0.5) =>
+    fetchJson<{
+      company_id: number; company_name: string; fuel_type: string;
+      monthly_gallons: number; current_fuel_price: number; hedge_ratio: number;
+      etf: StrategyRecommendation[];
+      options: { approach: string; contracts_needed: number; total_premium: number; max_loss: number; breakeven_price: number; strike_price: number; description: string; license_required: string };
+      futures: { approach: string; contracts_needed: number; total_margin_required: number; notional_value: number; correlation: number; description: string; license_required: string };
+      comparison: { approach: string; annual_cost: number; upfront_capital: number; max_loss: string; correlation: string; liquidity: string; complexity: string; license: string; best_for: string }[];
+    }>(`/hedging/all-strategies/${companyId}?hedge_ratio=${hedgeRatio}`),
 };
 
 // Deals
@@ -108,13 +119,16 @@ export const dealsApi = {
 // AI
 export const aiApi = {
   recommend: (companyId: number) =>
-    fetchJson<AIResponse>(`/ai/recommend/${companyId}`, { method: "POST" }),
+    fetchJson<AIResponse>(`/ai/recommend/${companyId}`, { method: "POST", timeoutMs: 90000 }),
   ask: (question: string, companyId?: number) =>
     fetchJson<AIResponse>("/ai/ask", {
       method: "POST",
       body: JSON.stringify({ question, company_id: companyId }),
+      timeoutMs: 90000,
     }),
-  marketOutlook: () => fetchJson<AIResponse>("/ai/market-outlook"),
+  marketOutlook: () => fetchJson<AIResponse>("/ai/market-outlook", { timeoutMs: 90000 }),
+  deepReport: (companyId: number) =>
+    fetchJson<AIResponse>(`/ai/deep-report/${companyId}`, { method: "POST", timeoutMs: 120000 }),
 };
 
 // Reports

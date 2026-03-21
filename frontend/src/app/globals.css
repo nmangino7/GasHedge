@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #1a1a1a;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --accent: #6366f1;
+  --accent-light: #eef2ff;
+  --positive: #10b981;
+  --negative: #ef4444;
+  --warning: #f59e0b;
 }
 
 @theme inline {
@@ -19,23 +24,77 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Notion-style clean inputs */
+/* Modern card styles */
+.card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.card:hover {
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08);
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px 0 rgb(0 0 0 / 0.1);
+}
+
+/* Gradient backgrounds */
+.gradient-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+.gradient-dark {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+}
+.gradient-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+.gradient-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+/* Clean inputs */
 input, select, textarea {
-  color: #1a1a1a;
+  color: #0f172a;
 }
-
 input::placeholder, textarea::placeholder {
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
-/* Clean scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Modern table styles */
+.data-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  padding: 10px 16px;
+  border-bottom: 2px solid #e2e8f0;
+  background: #f8fafc;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+.data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
 }
-::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
+.data-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* Smooth transitions */
+button, a {
+  transition: all 0.15s ease;
+}
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
 }

@@ -346,6 +346,133 @@ export function historicalBacktest(
   };
 }
 
+// --- Options Strategy ---
+// Call options on fuel futures (RBOB gasoline or ULSD diesel)
+export function calculateOptionsStrategy(
+  monthlyGallons: number,
+  fuelType: string,
+  currentFuelPrice: number,
+  hedgeRatio: number = 0.5
+) {
+  const annualGallons = monthlyGallons * 12;
+  const gallonsToHedge = annualGallons * hedgeRatio;
+  const contractSize = 42000; // Standard futures contract = 42,000 gallons
+  const contractsNeeded = Math.max(1, Math.round(gallonsToHedge / contractSize));
+  const actualGallonsHedged = contractsNeeded * contractSize;
+
+  // Option premium estimate: ~5-8% of notional for 6-month at-the-money call
+  const notionalPerContract = contractSize * currentFuelPrice;
+  const premiumRate = 0.065; // ~6.5% of notional
+  const premiumPerContract = notionalPerContract * premiumRate;
+  const totalPremium = premiumPerContract * contractsNeeded;
+
+  const strikePrice = currentFuelPrice; // At-the-money
+  const breakevenPrice = currentFuelPrice * (1 + premiumRate);
+
+  return {
+    approach: "options" as const,
+    contracts_needed: contractsNeeded,
+    contract_size_gallons: contractSize,
+    total_premium: Math.round(totalPremium),
+    max_loss: Math.round(totalPremium), // Max loss = premium paid
+    breakeven_price: Math.round(breakevenPrice * 1000) / 1000,
+    strike_price: Math.round(strikePrice * 1000) / 1000,
+    expiry_months: 6,
+    license_required: "Series 3" as const,
+    description: `Buy ${contractsNeeded} ${fuelType === "diesel" ? "ULSD" : "RBOB"} call option contracts at $${strikePrice.toFixed(3)} strike. Total premium: $${totalPremium.toLocaleString()}. Max downside is the premium paid. Profitable when ${fuelType} exceeds $${breakevenPrice.toFixed(3)}/gal.`,
+  };
+}
+
+// --- Futures Strategy ---
+// Direct futures hedging (RBOB gasoline or ULSD diesel)
+export function calculateFuturesStrategy(
+  monthlyGallons: number,
+  fuelType: string,
+  currentFuelPrice: number,
+  hedgeRatio: number = 0.5
+) {
+  const annualGallons = monthlyGallons * 12;
+  const gallonsToHedge = annualGallons * hedgeRatio;
+  const contractSize = 42000;
+  const contractsNeeded = Math.max(1, Math.round(gallonsToHedge / contractSize));
+
+  const notionalValue = contractsNeeded * contractSize * currentFuelPrice;
+  // Margin requirement: ~10% of notional for energy futures
+  const marginPerContract = Math.round(contractSize * currentFuelPrice * 0.10);
+  const totalMargin = marginPerContract * contractsNeeded;
+
+  const futuresCorrelation = fuelType === "diesel" ? 0.95 : 0.92; // Futures have higher correlation than ETFs
+
+  return {
+    approach: "futures" as const,
+    contracts_needed: contractsNeeded,
+    contract_size_gallons: contractSize,
+    margin_per_contract: marginPerContract,
+    total_margin_required: totalMargin,
+    notional_value: Math.round(notionalValue),
+    correlation: futuresCorrelation,
+    license_required: "Series 3" as const,
+    description: `Buy ${contractsNeeded} ${fuelType === "diesel" ? "ULSD" : "RBOB"} futures contracts. Margin required: $${totalMargin.toLocaleString()} (${contractsNeeded} × $${marginPerContract.toLocaleString()}). ${(futuresCorrelation * 100).toFixed(0)}% correlation to retail ${fuelType}. Strongest hedge but requires active management and Series 3 license.`,
+  };
+}
+
+// --- Compare All Strategies ---
+export function compareAllStrategies(
+  monthlyGallons: number,
+  fuelType: string,
+  currentFuelPrice: number,
+  etfPrices: Record<string, number>,
+  hedgeRatio: number = 0.5
+) {
+  const etfStrategies = recommendStrategy(fuelType, monthlyGallons, currentFuelPrice, etfPrices);
+  const moderateETF = etfStrategies.find(s => s.tier === "moderate") || etfStrategies[1];
+  const options = calculateOptionsStrategy(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio);
+  const futures = calculateFuturesStrategy(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio);
+
+  const comparison = [
+    {
+      approach: "ETF",
+      annual_cost: moderateETF.position.annual_expense_cost,
+      upfront_capital: moderateETF.position.dollar_notional,
+      max_loss: "Unlimited (ETF can lose value)",
+      correlation: `${(moderateETF.position.correlation_to_retail * 100).toFixed(0)}%`,
+      liquidity: "High — sell anytime during market hours",
+      complexity: "Low",
+      license: "Series 65/66 (advisory)",
+      best_for: "Most small businesses, simplest approach",
+    },
+    {
+      approach: "Options",
+      annual_cost: options.total_premium,
+      upfront_capital: options.total_premium,
+      max_loss: `$${options.max_loss.toLocaleString()} (premium only)`,
+      correlation: "90-95% (direct fuel futures)",
+      liquidity: "Moderate — exchange-traded",
+      complexity: "Medium",
+      license: "Series 3 required",
+      best_for: "Cost-conscious hedgers who want capped downside",
+    },
+    {
+      approach: "Futures",
+      annual_cost: 0,
+      upfront_capital: futures.total_margin_required,
+      max_loss: "Unlimited (margin calls possible)",
+      correlation: `${(futures.correlation * 100).toFixed(0)}%`,
+      liquidity: "High — exchange-traded",
+      complexity: "High",
+      license: "Series 3 required",
+      best_for: "Large fleets with sophisticated management",
+    },
+  ];
+
+  return {
+    etf: etfStrategies,
+    options,
+    futures,
+    comparison,
+  };
+}
+
 export function calculateDealRevenue(
   feeStructure: string,
   feeAmount: number,
