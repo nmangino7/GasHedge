@@ -1,0 +1,50 @@
+import { companyStore } from "@/lib/store";
+import { getCurrentPrice } from "@/lib/eia-service";
+import {
+  recommendStrategy,
+  DEFAULT_ETF_PRICES,
+} from "@/lib/hedging-engine";
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ companyId: string }> }
+) {
+  const { companyId } = await params;
+  const company = companyStore.get(Number(companyId));
+  if (!company)
+    return Response.json({ detail: "Company not found" }, { status: 404 });
+
+  let fuelType: string;
+  let monthlyGallons: number;
+  if (company.fuel_type === "gasoline") {
+    fuelType = "gasoline";
+    monthlyGallons = company.monthly_gallons_gasoline || 0;
+  } else if (company.fuel_type === "diesel") {
+    fuelType = "diesel";
+    monthlyGallons = company.monthly_gallons_diesel || 0;
+  } else {
+    fuelType = "gasoline";
+    monthlyGallons =
+      (company.monthly_gallons_gasoline || 0) +
+      (company.monthly_gallons_diesel || 0);
+  }
+
+  const fuelPrice =
+    (await getCurrentPrice(fuelType, company.padd_region)) || 3.5;
+
+  const recommendations = recommendStrategy(
+    fuelType,
+    monthlyGallons,
+    fuelPrice,
+    DEFAULT_ETF_PRICES
+  );
+
+  return Response.json({
+    company_id: Number(companyId),
+    company_name: company.name,
+    fuel_type: fuelType,
+    monthly_gallons: monthlyGallons,
+    current_fuel_price: fuelPrice,
+    recommendations,
+  });
+}
