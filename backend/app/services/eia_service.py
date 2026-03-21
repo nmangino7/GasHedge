@@ -60,6 +60,10 @@ class EIAService:
             if cached:
                 return cached
 
+        # If no API key configured, return empty (callers use fallback prices)
+        if not self.api_key or self.api_key == "your_eia_api_key_here":
+            return []
+
         params = {
             "api_key": self.api_key,
             "frequency": "weekly",
@@ -98,7 +102,7 @@ class EIAService:
                 cached = self._get_cached_prices(db, series_key, start_date, end_date)
                 if cached:
                     return cached
-            raise e
+            return []
 
     async def get_current_price(
         self, fuel_type: str, region: str, db: Optional[Session] = None

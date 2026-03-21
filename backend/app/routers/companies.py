@@ -117,8 +117,6 @@ async def get_exposure(company_id: int, db: Session = Depends(get_db)):
         company_id=company.id,
         company_name=company.name,
         fuel_type=company.fuel_type,
-        current_price_gasoline=gas_price,
-        current_price_diesel=diesel_price,
         **exposure,
     )
 

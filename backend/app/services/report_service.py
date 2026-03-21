@@ -76,10 +76,10 @@ class ReportService:
             "SubHeader", parent=styles["Heading2"],
             fontSize=12, textColor=SECONDARY, spaceBefore=12, spaceAfter=6,
         ))
-        styles.add(ParagraphStyle(
-            "BodyText", parent=styles["Normal"],
-            fontSize=10, leading=14, alignment=TA_JUSTIFY, spaceAfter=6,
-        ))
+        styles["BodyText"].fontSize = 10
+        styles["BodyText"].leading = 14
+        styles["BodyText"].alignment = TA_JUSTIFY
+        styles["BodyText"].spaceAfter = 6
         styles.add(ParagraphStyle(
             "Disclaimer", parent=styles["Normal"],
             fontSize=7, leading=9, textColor=HexColor("#718096"), spaceAfter=4,
