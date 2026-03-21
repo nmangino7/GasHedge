@@ -152,6 +152,82 @@ export function recommendStrategy(
   });
 }
 
+export function calculateAnnuityOptions(
+  monthlyGallons: number,
+  fuelType: string,
+  currentFuelPrice: number,
+  hedgeRatio: number = 0.5
+) {
+  const annualFuelCost = monthlyGallons * 12 * currentFuelPrice;
+  const hedgedCost = annualFuelCost * hedgeRatio;
+
+  const variableSurrenderSchedule = [
+    { year: 1, charge_pct: 7 },
+    { year: 2, charge_pct: 6 },
+    { year: 3, charge_pct: 5 },
+    { year: 4, charge_pct: 4 },
+    { year: 5, charge_pct: 3 },
+    { year: 6, charge_pct: 2 },
+    { year: 7, charge_pct: 1 },
+    { year: 8, charge_pct: 0 },
+  ];
+
+  const fixedSurrenderSchedule = [
+    { year: 1, charge_pct: 8 },
+    { year: 2, charge_pct: 7 },
+    { year: 3, charge_pct: 6 },
+    { year: 4, charge_pct: 5 },
+    { year: 5, charge_pct: 4 },
+    { year: 6, charge_pct: 3 },
+    { year: 7, charge_pct: 2 },
+    { year: 8, charge_pct: 1 },
+    { year: 9, charge_pct: 0 },
+  ];
+
+  const variableFeesPct = 2.1; // M&E 1.25% + admin 0.15% + sub-account ~0.7%
+  const fixedFeesPct = 1.5; // spread/margin built into crediting
+
+  const variablePremium = Math.round(hedgedCost * 100) / 100;
+  const fixedPremium = Math.round(hedgedCost * 100) / 100;
+
+  return [
+    {
+      type: "variable" as const,
+      label: "Variable Annuity — Commodity Sub-Accounts",
+      description:
+        "Invest in commodity-linked sub-accounts (energy/oil funds) within a tax-deferred annuity wrapper. Value fluctuates with fuel markets, providing a direct hedge. Higher fees but more upside potential.",
+      estimated_premium: variablePremium,
+      annual_fees_pct: variableFeesPct,
+      annual_fee_dollar: Math.round(variablePremium * variableFeesPct / 100),
+      surrender_period_years: 7,
+      surrender_schedule: variableSurrenderSchedule,
+      early_withdrawal_penalty_pct: 10,
+      min_age_penalty_free: 59.5,
+      free_withdrawal_pct: 10,
+      tax_deferred: true,
+      liquidity_rating: "low" as const,
+      commodity_exposure: fuelType === "diesel" ? "Energy/Oil sector sub-accounts" : "Energy/Gasoline sector sub-accounts",
+    },
+    {
+      type: "fixed_indexed" as const,
+      label: "Fixed Indexed Annuity — Commodity Index",
+      description:
+        "Returns tied to a commodity price index with principal protection. Floor of 0% return (won't lose principal) with a cap on upside. Lower fees, but gains are capped and may not fully track fuel prices.",
+      estimated_premium: fixedPremium,
+      annual_fees_pct: fixedFeesPct,
+      annual_fee_dollar: Math.round(fixedPremium * fixedFeesPct / 100),
+      surrender_period_years: 8,
+      surrender_schedule: fixedSurrenderSchedule,
+      early_withdrawal_penalty_pct: 10,
+      min_age_penalty_free: 59.5,
+      free_withdrawal_pct: 10,
+      tax_deferred: true,
+      liquidity_rating: "low" as const,
+      commodity_exposure: "S&P GSCI Energy Index or similar commodity benchmark",
+    },
+  ];
+}
+
 export function calculateExposure(
   monthlyGallonsGasoline: number,
   monthlyGallonsDiesel: number,

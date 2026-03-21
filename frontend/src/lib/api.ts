@@ -1,7 +1,7 @@
 import type {
   Company, CompanyCreate, ExposureData, BenchmarkData,
   CurrentPrice, PricePoint, HedgePosition, StrategyRecommendation,
-  ScenarioResult, Deal, RevenueData, AIResponse,
+  ScenarioResult, Deal, RevenueData, AIResponse, AnnuityOption,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -55,6 +55,7 @@ export const hedgingApi = {
       company_id: number; company_name: string; fuel_type: string;
       monthly_gallons: number; current_fuel_price: number;
       recommendations: StrategyRecommendation[];
+      annuity_options: AnnuityOption[];
     }>(`/hedging/recommend/${companyId}`),
   calculate: (data: { monthly_gallons: number; fuel_type: string; product_ticker: string; hedge_ratio: number }) =>
     fetchJson<HedgePosition>("/hedging/calculate", { method: "POST", body: JSON.stringify(data) }),

@@ -1,7 +1,7 @@
 export const maxDuration = 30;
 import { companyStore } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
-import { recommendStrategy } from "@/lib/hedging-engine";
+import { recommendStrategy, calculateAnnuityOptions } from "@/lib/hedging-engine";
 import { getAllETFPrices } from "@/lib/alpha-vantage";
 
 export async function GET(
@@ -40,6 +40,13 @@ export async function GET(
     etfPrices
   );
 
+  const annuityOptions = calculateAnnuityOptions(
+    monthlyGallons,
+    fuelType,
+    fuelPrice,
+    0.5
+  );
+
   return Response.json({
     company_id: Number(companyId),
     company_name: company.name,
@@ -47,5 +54,6 @@ export async function GET(
     monthly_gallons: monthlyGallons,
     current_fuel_price: fuelPrice,
     recommendations,
+    annuity_options: annuityOptions,
   });
 }

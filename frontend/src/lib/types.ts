@@ -138,6 +138,23 @@ export interface RevenueData {
   top_clients: { company_id: number; company_name: string; annual_revenue: number; deal_count: number }[];
 }
 
+export interface AnnuityOption {
+  type: "variable" | "fixed_indexed";
+  label: string;
+  description: string;
+  estimated_premium: number;
+  annual_fees_pct: number;
+  annual_fee_dollar: number;
+  surrender_period_years: number;
+  surrender_schedule: { year: number; charge_pct: number }[];
+  early_withdrawal_penalty_pct: number;
+  min_age_penalty_free: number;
+  free_withdrawal_pct: number;
+  tax_deferred: boolean;
+  liquidity_rating: "low" | "medium" | "high";
+  commodity_exposure: string;
+}
+
 export interface AIResponse {
   response: string;
   disclaimers: string[];

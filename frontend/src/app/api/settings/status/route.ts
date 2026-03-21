@@ -19,10 +19,13 @@ export async function GET() {
   let eiaMessage = "Not configured";
   if (eiaConfigured) {
     try {
+      const now = new Date();
+      const endDate = now.toISOString().slice(0, 10);
+      const startDate = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(
-        `https://api.eia.gov/v2/petroleum/pri/gnd/data/?api_key=${eiaKey}&frequency=weekly&data[0]=value&facets[duoarea][]=NUS&facets[product][]=EPM0&start=2026-01-01&end=2026-12-31&length=1`,
+        `https://api.eia.gov/v2/petroleum/pri/gnd/data/?api_key=${eiaKey}&frequency=weekly&data[0]=value&facets[duoarea][]=NUS&facets[product][]=EPM0&start=${startDate}&end=${endDate}&sort[0][column]=period&sort[0][direction]=desc&length=5`,
         { cache: "no-store", signal: controller.signal }
       );
       clearTimeout(timeoutId);
@@ -31,8 +34,8 @@ export async function GET() {
         const rows = data?.response?.data || [];
         eiaTest = rows.length > 0 ? "success" : "error";
         eiaMessage = rows.length > 0
-          ? `Connected — ${rows.length} data point(s) returned`
-          : "Key accepted but no data returned (may be a date range issue)";
+          ? `Connected — latest price: $${rows[0]?.value || "N/A"}/gal (${rows[0]?.period || "unknown"})`
+          : "Key accepted but no recent data returned — EIA may be updating";
       } else {
         eiaTest = "error";
         eiaMessage = `API returned ${res.status}: ${res.statusText}`;
