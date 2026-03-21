@@ -1,12 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, DollarSign, Fuel, Settings, Shield, X } from "lucide-react";
+import { BarChart3, Building2, DollarSign, Fuel, Settings, X } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: BarChart3 },
   { href: "/companies", label: "Companies", icon: Building2 },
-  { href: "/annuities", label: "Annuities", icon: Shield },
   { href: "/deals", label: "Deals & Revenue", icon: DollarSign },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -80,7 +79,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         <div className="px-5 py-4 border-t border-gray-100">
           <p className="text-[11px] text-gray-400 leading-relaxed">
             Series 65/6/63 Licensed<br />
-            ETF &amp; Annuity Advisory
+            ETF Advisory
           </p>
         </div>
       </aside>

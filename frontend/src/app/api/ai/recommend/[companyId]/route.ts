@@ -9,24 +9,31 @@ import {
 import { createAnthropicClient, AI_MODEL } from "@/lib/ai-client";
 
 const SYSTEM_PROMPT = `You are a fuel cost management advisor for small businesses.
-You provide recommendations using securities-based products (ETFs like UGA, USO, BNO, UNL)
-and annuity-based hedging strategies that the advisory firm is licensed to recommend.
+You provide actionable ETF-based hedging recommendations that the advisory firm is licensed to recommend.
 
 IMPORTANT CONSTRAINTS:
-- Recommend ETF-based hedging strategies and mention annuity alternatives (no futures, swaps, or options)
+- ONLY recommend ETF-based hedging strategies using UGA, USO, BNO, or UNL (no futures, swaps, options, or annuities)
 - Include disclaimer that past performance does not guarantee future results
 - Explain concepts simply for business owners, not traders
 - Focus on business impact: what does this mean for their bottom line
 - Always mention the costs: ETF expense ratios, advisory fees, K-1 tax complexity
-- Never make specific buy/sell recommendations — frame as analysis and advisory
-- You are NOT a broker — you are an investment adviser providing guidance
+- Frame as analysis and advisory guidance
+- Be specific: mention exact share counts, dollar amounts, and breakeven prices
+- Include step-by-step implementation advice
 
-ANNUITY ALTERNATIVES:
-- Variable Annuity (commodity sub-accounts): tax-deferred, ~2.1% annual fees, 7-year surrender period
-- Fixed Indexed Annuity (commodity index): principal protection, ~1.5% fees, 8-year surrender period
-- AGE 59½ RULE: 10% IRS penalty on gains if withdrawn before 59½, but owners CAN still access funds
-- Free withdrawal: 10%/year without surrender charges; 72(t)/SEPP avoids IRS penalty at any age
-- Always compare: ETFs offer better liquidity and lower fees, annuities offer tax deferral and principal protection (FIA)`;
+ETF PRODUCTS:
+- UGA (US Gasoline Fund): 88% correlation to retail gasoline, 0.97% expense ratio
+- USO (US Oil Fund): 80% correlation to retail diesel, 0.81% expense ratio
+- BNO (US Brent Oil Fund): 78% correlation, 0.90% expense ratio
+
+IMPLEMENTATION STEPS TO COVER:
+1. Which brokerage to use (Schwab, Fidelity, IBKR)
+2. Exact capital needed and shares to purchase
+3. Order type (limit order during market hours)
+4. Monitoring plan (weekly price tracking)
+5. Rebalancing schedule (quarterly, if >10% drift)
+6. Tax implications (K-1 form, 60/40 capital gains)
+7. Exit strategy (when to sell, settlement T+1)`;
 
 export async function POST(
   _req: Request,
@@ -40,11 +47,10 @@ export async function POST(
 
     const client = createAnthropicClient();
     if (!client) {
-      return Response.json({
-        response:
-          "Claude API key not configured. Add ANTHROPIC_API_KEY (or CLAUDE_API_KEY) to your Vercel environment variables, then redeploy.",
-        disclaimers: DISCLAIMERS,
-      });
+      return Response.json(
+        { error: "Anthropic API key not configured. Add ANTHROPIC_API_KEY to your Vercel environment variables, then redeploy." },
+        { status: 503 }
+      );
     }
 
     const fuelType =
@@ -96,11 +102,14 @@ FUEL EXPOSURE:
 
 STRATEGY OPTIONS: ${JSON.stringify(strategies, null, 2)}
 
-Please provide:
-1. A clear recommendation on which strategy tier is best
-2. A plain-language explanation of how the hedge works
-3. The key risks and costs
-4. Expected outcomes in different price scenarios`,
+Please provide a detailed, actionable recommendation:
+1. Which strategy tier is best for this specific company and why
+2. Exactly how the hedge works in plain language (buy X shares of Y ETF)
+3. The breakeven point — at what fuel price does the hedge start saving money
+4. Step-by-step implementation: which broker, how to fund, how to place the trade
+5. Key risks and all-in costs (expense ratio + advisory fees)
+6. What happens in 3 scenarios: prices rise 20%, stay flat, drop 20%
+7. Monitoring and rebalancing plan`,
         },
       ],
     });
@@ -122,9 +131,9 @@ Please provide:
     } else if (errMsg.includes("timeout") || errMsg.includes("abort") || errMsg.includes("ECONNREFUSED")) {
       userMessage = "AI request timed out. The Anthropic API may be temporarily unavailable.";
     }
-    return Response.json({
-      response: userMessage,
-      disclaimers: DISCLAIMERS,
-    });
+    return Response.json(
+      { error: userMessage },
+      { status: 502 }
+    );
   }
 }

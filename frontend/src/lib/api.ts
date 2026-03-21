@@ -1,21 +1,43 @@
 import type {
   Company, CompanyCreate, ExposureData, BenchmarkData,
   CurrentPrice, PricePoint, HedgePosition, StrategyRecommendation,
-  ScenarioResult, Deal, RevenueData, AIResponse, AnnuityOption,
+  ScenarioResult, Deal, RevenueData, AIResponse,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API Error ${res.status}: ${err}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      ...options,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      let errorMessage = `API Error (${res.status})`;
+      try {
+        const errBody = await res.json();
+        errorMessage = errBody.error || errBody.detail || errorMessage;
+        if (errBody.details) errorMessage += ` — ${errBody.details}`;
+      } catch {
+        const text = await res.text().catch(() => "");
+        if (text) errorMessage = text;
+      }
+      throw new Error(errorMessage);
+    }
+    return res.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out after 30 seconds. The server may be overloaded.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json();
 }
 
 // Companies
@@ -55,7 +77,6 @@ export const hedgingApi = {
       company_id: number; company_name: string; fuel_type: string;
       monthly_gallons: number; current_fuel_price: number;
       recommendations: StrategyRecommendation[];
-      annuity_options: AnnuityOption[];
     }>(`/hedging/recommend/${companyId}`),
   calculate: (data: { monthly_gallons: number; fuel_type: string; product_ticker: string; hedge_ratio: number }) =>
     fetchJson<HedgePosition>("/hedging/calculate", { method: "POST", body: JSON.stringify(data) }),
@@ -98,10 +119,22 @@ export const aiApi = {
 
 // Reports
 export const reportsApi = {
-  generate: (companyId: number, data: { hedge_ratio?: number; product_ticker?: string; strategy_id?: number }) =>
-    fetchJson<{ filename: string; download_url: string }>(`/reports/generate/${companyId}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  downloadUrl: (filename: string) => `${API_BASE}/reports/download/${filename}`,
+  detailed: (companyId: number, hedgeRatio = 0.5, ticker = "UGA") =>
+    fetchJson<{
+      company: { id: number; name: string; company_type: string; fuel_type: string; fleet_size: number; region: string; monthly_gallons: number; annual_revenue: number | null };
+      current_price: number;
+      strategies: { tier: string; product_ticker: string; product_name: string; hedge_ratio: number; position: HedgePosition; rationale: string }[];
+      selected_hedge_ratio: number;
+      selected_ticker: string;
+      hedge_position: HedgePosition;
+      detailed_scenarios: {
+        scenarios: ScenarioResult[];
+        breakeven: { price_change_pct: number; fuel_price_per_gallon: number; description: string };
+        monthly_projections: { month: string; unhedged_cost: number; hedged_cost: number; savings: number }[];
+        annual_summary: { current_annual_cost: number; hedge_annual_expense: number; gallons_hedged: number; effective_coverage: number };
+      };
+      volatility: { annualized_volatility: number; trend: string; price_range_52w: { min: number; max: number } } | null;
+    }>(`/reports/detailed/${companyId}?hedge_ratio=${hedgeRatio}&product_ticker=${ticker}`),
+  generateHtml: (companyId: number, hedgeRatio = 0.5, ticker = "UGA") =>
+    `${API_BASE}/reports/generate/${companyId}?hedge_ratio=${hedgeRatio}&product_ticker=${ticker}`,
 };

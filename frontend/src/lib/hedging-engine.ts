@@ -152,80 +152,58 @@ export function recommendStrategy(
   });
 }
 
-export function calculateAnnuityOptions(
+export function detailedScenarioAnalysis(
   monthlyGallons: number,
-  fuelType: string,
-  currentFuelPrice: number,
-  hedgeRatio: number = 0.5
+  hedgePosition: ReturnType<typeof calculateHedgePosition>,
+  currentFuelPrice: number
 ) {
-  const annualFuelCost = monthlyGallons * 12 * currentFuelPrice;
-  const hedgedCost = annualFuelCost * hedgeRatio;
+  // 19 price points from -30% to +60% in 5% increments
+  const changes = Array.from({ length: 19 }, (_, i) => -0.3 + i * 0.05);
+  const scenarios = scenarioAnalysis(monthlyGallons, hedgePosition, currentFuelPrice, changes);
 
-  const variableSurrenderSchedule = [
-    { year: 1, charge_pct: 7 },
-    { year: 2, charge_pct: 6 },
-    { year: 3, charge_pct: 5 },
-    { year: 4, charge_pct: 4 },
-    { year: 5, charge_pct: 3 },
-    { year: 6, charge_pct: 2 },
-    { year: 7, charge_pct: 1 },
-    { year: 8, charge_pct: 0 },
+  // Calculate exact breakeven: the price change where savings = 0
+  // Savings formula: savings = hedgePnl - expenseCost
+  // hedgePnl = notional * change * correlation
+  // At breakeven: notional * change * correlation = expenseCost
+  // change = expenseCost / (notional * correlation)
+  const breakevenChange = hedgePosition.annual_expense_cost /
+    (hedgePosition.dollar_notional * hedgePosition.correlation_to_retail);
+  const breakevenPrice = Math.round(currentFuelPrice * (1 + breakevenChange) * 1000) / 1000;
+
+  // Monthly projections at current price (no change scenario)
+  const monthlyGallonsVal = monthlyGallons;
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
   ];
+  const monthlyProjections = months.map((name) => {
+    const unhedged = monthlyGallonsVal * currentFuelPrice;
+    const hedgeCostPerMonth = hedgePosition.annual_expense_cost / 12;
+    const hedgedSavingsPerMonth = 0; // At current price, ETF PnL = 0
+    const hedged = unhedged + hedgeCostPerMonth - hedgedSavingsPerMonth;
+    return {
+      month: name,
+      unhedged_cost: Math.round(unhedged * 100) / 100,
+      hedged_cost: Math.round(hedged * 100) / 100,
+      savings: Math.round((unhedged - hedged) * 100) / 100,
+    };
+  });
 
-  const fixedSurrenderSchedule = [
-    { year: 1, charge_pct: 8 },
-    { year: 2, charge_pct: 7 },
-    { year: 3, charge_pct: 6 },
-    { year: 4, charge_pct: 5 },
-    { year: 5, charge_pct: 4 },
-    { year: 6, charge_pct: 3 },
-    { year: 7, charge_pct: 2 },
-    { year: 8, charge_pct: 1 },
-    { year: 9, charge_pct: 0 },
-  ];
-
-  const variableFeesPct = 2.1; // M&E 1.25% + admin 0.15% + sub-account ~0.7%
-  const fixedFeesPct = 1.5; // spread/margin built into crediting
-
-  const variablePremium = Math.round(hedgedCost * 100) / 100;
-  const fixedPremium = Math.round(hedgedCost * 100) / 100;
-
-  return [
-    {
-      type: "variable" as const,
-      label: "Variable Annuity — Commodity Sub-Accounts",
-      description:
-        "Invest in commodity-linked sub-accounts (energy/oil funds) within a tax-deferred annuity wrapper. Value fluctuates with fuel markets, providing a direct hedge. Higher fees but more upside potential.",
-      estimated_premium: variablePremium,
-      annual_fees_pct: variableFeesPct,
-      annual_fee_dollar: Math.round(variablePremium * variableFeesPct / 100),
-      surrender_period_years: 7,
-      surrender_schedule: variableSurrenderSchedule,
-      early_withdrawal_penalty_pct: 10,
-      min_age_penalty_free: 59.5,
-      free_withdrawal_pct: 10,
-      tax_deferred: true,
-      liquidity_rating: "low" as const,
-      commodity_exposure: fuelType === "diesel" ? "Energy/Oil sector sub-accounts" : "Energy/Gasoline sector sub-accounts",
+  return {
+    scenarios,
+    breakeven: {
+      price_change_pct: Math.round(breakevenChange * 10000) / 10000,
+      fuel_price_per_gallon: breakevenPrice,
+      description: `Hedging becomes profitable when fuel prices rise more than ${(breakevenChange * 100).toFixed(1)}% above current levels ($${breakevenPrice}/gal)`,
     },
-    {
-      type: "fixed_indexed" as const,
-      label: "Fixed Indexed Annuity — Commodity Index",
-      description:
-        "Returns tied to a commodity price index with principal protection. Floor of 0% return (won't lose principal) with a cap on upside. Lower fees, but gains are capped and may not fully track fuel prices.",
-      estimated_premium: fixedPremium,
-      annual_fees_pct: fixedFeesPct,
-      annual_fee_dollar: Math.round(fixedPremium * fixedFeesPct / 100),
-      surrender_period_years: 8,
-      surrender_schedule: fixedSurrenderSchedule,
-      early_withdrawal_penalty_pct: 10,
-      min_age_penalty_free: 59.5,
-      free_withdrawal_pct: 10,
-      tax_deferred: true,
-      liquidity_rating: "low" as const,
-      commodity_exposure: "S&P GSCI Energy Index or similar commodity benchmark",
+    monthly_projections: monthlyProjections,
+    annual_summary: {
+      current_annual_cost: Math.round(monthlyGallons * 12 * currentFuelPrice * 100) / 100,
+      hedge_annual_expense: hedgePosition.annual_expense_cost,
+      gallons_hedged: hedgePosition.gallons_hedged,
+      effective_coverage: hedgePosition.effective_hedge_ratio,
     },
-  ];
+  };
 }
 
 export function calculateExposure(

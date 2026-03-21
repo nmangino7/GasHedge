@@ -16,11 +16,10 @@ export async function GET() {
     const client = createAnthropicClient();
 
     if (!client) {
-      return Response.json({
-        response:
-          "Claude API key not configured. Add ANTHROPIC_API_KEY (or CLAUDE_API_KEY) to your Vercel environment variables.",
-        disclaimers: DISCLAIMERS,
-      });
+      return Response.json(
+        { error: "Anthropic API key not configured. Add ANTHROPIC_API_KEY to your Vercel environment variables." },
+        { status: 503 }
+      );
     }
 
     const gasPrice = await getCurrentPrice("gasoline", "NUS");
@@ -62,10 +61,11 @@ Please provide a 2-3 paragraph market outlook covering:
       disclaimers: DISCLAIMERS,
     });
   } catch (e) {
-    console.error("[AI Market Outlook] Error:", e);
-    return Response.json({
-      response: `Error: ${e instanceof Error ? e.message : String(e)}`,
-      disclaimers: DISCLAIMERS,
-    });
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[AI Market Outlook] Error:", errMsg);
+    return Response.json(
+      { error: `Market outlook error: ${errMsg}` },
+      { status: 502 }
+    );
   }
 }
