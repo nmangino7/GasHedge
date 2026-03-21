@@ -158,7 +158,7 @@ export function detailedScenarioAnalysis(
   currentFuelPrice: number
 ) {
   // 19 price points from -30% to +60% in 5% increments
-  const changes = Array.from({ length: 19 }, (_, i) => -0.3 + i * 0.05);
+  const changes = Array.from({ length: 19 }, (_, i) => Math.round((-0.3 + i * 0.05) * 100) / 100);
   const scenarios = scenarioAnalysis(monthlyGallons, hedgePosition, currentFuelPrice, changes);
 
   // Calculate exact breakeven: the price change where savings = 0
