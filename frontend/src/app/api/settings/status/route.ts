@@ -1,3 +1,4 @@
+export const maxDuration = 60;
 import { getAnthropicApiKey } from "@/lib/ai-client";
 
 interface ApiKeyStatus {
@@ -18,31 +19,36 @@ export async function GET() {
   let eiaTest: "success" | "error" | "not_configured" = "not_configured";
   let eiaMessage = "Not configured";
   if (eiaConfigured) {
-    try {
-      const now = new Date();
-      const endDate = now.toISOString().slice(0, 10);
-      const startDate = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(
-        `https://api.eia.gov/v2/petroleum/pri/gnd/data/?api_key=${eiaKey}&frequency=weekly&data[0]=value&facets[duoarea][]=NUS&facets[product][]=EPM0&start=${startDate}&end=${endDate}&sort[0][column]=period&sort[0][direction]=desc&length=5`,
-        { cache: "no-store", signal: controller.signal }
-      );
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const data = await res.json();
-        const rows = data?.response?.data || [];
-        eiaTest = rows.length > 0 ? "success" : "error";
-        eiaMessage = rows.length > 0
-          ? `Connected — latest price: $${rows[0]?.value || "N/A"}/gal (${rows[0]?.period || "unknown"})`
-          : "Key accepted but no recent data returned — EIA may be updating";
-      } else {
+    const now = new Date();
+    const endDate = now.toISOString().slice(0, 10);
+    const startDate = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
+    const url = `https://api.eia.gov/v2/petroleum/pri/gnd/data/?api_key=${eiaKey}&frequency=weekly&data[0]=value&facets[duoarea][]=NUS&facets[product][]=EPM0&start=${startDate}&end=${endDate}&sort[0][column]=period&sort[0][direction]=desc&length=5`;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const rows = data?.response?.data || [];
+          eiaTest = rows.length > 0 ? "success" : "error";
+          eiaMessage = rows.length > 0
+            ? `Connected — latest price: $${rows[0]?.value || "N/A"}/gal (${rows[0]?.period || "unknown"})`
+            : "Key accepted but no recent data returned — EIA may be updating";
+        } else {
+          eiaTest = "error";
+          eiaMessage = `API returned ${res.status}: ${res.statusText}`;
+        }
+        break;
+      } catch (e) {
         eiaTest = "error";
-        eiaMessage = `API returned ${res.status}: ${res.statusText}`;
+        eiaMessage = `Connection failed: ${e instanceof Error ? e.message : String(e)}`;
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
+        }
       }
-    } catch (e) {
-      eiaTest = "error";
-      eiaMessage = `Connection failed: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
   keys.push({
