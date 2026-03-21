@@ -1,8 +1,5 @@
 "use client";
-import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, Area, ComposedChart,
-} from "recharts";
+import { ResponsiveContainer, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart } from "recharts";
 import type { ScenarioResult } from "@/lib/types";
 
 const formatCurrency = (val: number) => `$${val.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -16,21 +13,22 @@ export default function ScenarioChart({ scenarios }: { scenarios: ScenarioResult
   }));
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-      <h3 className="text-lg font-semibold text-slate-800 mb-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <h3 className="text-sm font-medium text-gray-900 mb-4">
         Hedged vs. Unhedged Annual Fuel Cost
       </h3>
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={320}>
         <ComposedChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 12 }} label={{ value: "Fuel Price Change", position: "insideBottom", offset: -5 }} />
-          <YAxis tickFormatter={formatCurrency} tick={{ fontSize: 11 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#6b7280" }} />
+          <YAxis tickFormatter={formatCurrency} tick={{ fontSize: 11, fill: "#6b7280" }} />
           <Tooltip
             formatter={(value, name) => [formatCurrency(Number(value)), name === "unhedged" ? "Unhedged Cost" : name === "hedged" ? "Hedged Cost" : "Savings"]}
+            contentStyle={{ fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 6 }}
           />
-          <Legend />
-          <Line type="monotone" dataKey="unhedged" name="Unhedged Cost" stroke="#e53e3e" strokeWidth={2.5} dot={{ r: 4 }} />
-          <Line type="monotone" dataKey="hedged" name="Hedged Cost" stroke="#48bb78" strokeWidth={2.5} dot={{ r: 4 }} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Line type="monotone" dataKey="unhedged" name="Unhedged Cost" stroke="#dc2626" strokeWidth={2} dot={{ r: 3 }} />
+          <Line type="monotone" dataKey="hedged" name="Hedged Cost" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

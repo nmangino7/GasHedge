@@ -8,9 +8,9 @@ export default function ComplianceDisclaimer({ disclaimers }: { disclaimers?: st
 
   return (
     <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Important Disclosures</p>
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Important Disclosures</p>
       {items.map((d, i) => (
-        <p key={i} className="text-xs text-gray-400 mb-1">{d}</p>
+        <p key={i} className="text-xs text-gray-500 mb-1 leading-relaxed">{d}</p>
       ))}
     </div>
   );

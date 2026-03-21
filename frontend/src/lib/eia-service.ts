@@ -1,18 +1,9 @@
 const EIA_BASE_URL = "https://api.eia.gov/v2/petroleum/pri/gnd/data/";
 
 const REGION_MAP: Record<string, string> = {
-  US: "NUS",
-  "East Coast": "R10",
-  Midwest: "R20",
-  "Gulf Coast": "R30",
-  "Rocky Mountain": "R40",
-  "West Coast": "R50",
-  R10: "R10",
-  R20: "R20",
-  R30: "R30",
-  R40: "R40",
-  R50: "R50",
-  NUS: "NUS",
+  US: "NUS", "East Coast": "R10", Midwest: "R20", "Gulf Coast": "R30",
+  "Rocky Mountain": "R40", "West Coast": "R50",
+  R10: "R10", R20: "R20", R30: "R30", R40: "R40", R50: "R50", NUS: "NUS",
 };
 
 const PRODUCT_MAP: Record<string, string> = {
@@ -29,6 +20,12 @@ export const REGION_LABELS: Record<string, string> = {
   R50: "West Coast (PADD 5)",
 };
 
+// Fallback prices if EIA API fails
+const FALLBACK_PRICES: Record<string, number> = {
+  gasoline: 3.50,
+  diesel: 3.90,
+};
+
 interface PricePoint {
   period: string;
   value: number;
@@ -41,7 +38,10 @@ export async function fetchPrices(
   endDate: string
 ): Promise<PricePoint[]> {
   const apiKey = process.env.EIA_API_KEY || "";
-  if (!apiKey || apiKey === "your_eia_api_key_here") return [];
+  if (!apiKey || apiKey === "your_eia_api_key_here") {
+    console.warn("[EIA] No API key configured");
+    return [];
+  }
 
   const duoarea = REGION_MAP[region] || "NUS";
   const product = PRODUCT_MAP[fuelType] || "EPM0";
@@ -61,9 +61,12 @@ export async function fetchPrices(
 
   try {
     const res = await fetch(`${EIA_BASE_URL}?${params}`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error(`[EIA] API returned ${res.status}: ${res.statusText}`);
+      return [];
+    }
     const data = await res.json();
 
     const prices: PricePoint[] = [];
@@ -72,8 +75,12 @@ export async function fetchPrices(
         prices.push({ period: row.period, value: Number(row.value) });
       }
     }
+    if (prices.length === 0) {
+      console.warn(`[EIA] No price data returned for ${fuelType}/${region}`);
+    }
     return prices;
-  } catch {
+  } catch (err) {
+    console.error("[EIA] Fetch error:", err);
     return [];
   }
 }
@@ -86,7 +93,9 @@ export async function getCurrentPrice(
   const end = now.toISOString().slice(0, 10);
   const start = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
   const prices = await fetchPrices(fuelType, region, start, end);
-  return prices.length > 0 ? prices[prices.length - 1].value : null;
+  if (prices.length > 0) return prices[prices.length - 1].value;
+  // Return fallback price instead of null
+  return FALLBACK_PRICES[fuelType] || null;
 }
 
 export async function getPriceHistory(
@@ -102,16 +111,7 @@ export async function getPriceHistory(
   return fetchPrices(fuelType, region, start, end);
 }
 
-export async function getAllCurrentPrices(): Promise<
-  {
-    fuel_type: string;
-    region: string;
-    region_label: string;
-    price_per_gallon: number;
-    week_change: number;
-    week_change_pct: number;
-  }[]
-> {
+export async function getAllCurrentPrices() {
   const results: {
     fuel_type: string;
     region: string;
@@ -130,16 +130,22 @@ export async function getAllCurrentPrices(): Promise<
           .toISOString()
           .slice(0, 10);
         const history = await fetchPrices(fuelType, regionCode, start, end);
-        if (history.length === 0) continue;
 
-        const price = history[history.length - 1].value;
+        let price: number;
         let weekChange = 0;
         let weekChangePct = 0;
-        if (history.length >= 2) {
-          weekChange = history[history.length - 1].value - history[history.length - 2].value;
-          if (history[history.length - 2].value > 0) {
-            weekChangePct = (weekChange / history[history.length - 2].value) * 100;
+
+        if (history.length > 0) {
+          price = history[history.length - 1].value;
+          if (history.length >= 2) {
+            weekChange = history[history.length - 1].value - history[history.length - 2].value;
+            if (history[history.length - 2].value > 0) {
+              weekChangePct = (weekChange / history[history.length - 2].value) * 100;
+            }
           }
+        } else {
+          // Use fallback price
+          price = FALLBACK_PRICES[fuelType] || 3.50;
         }
 
         results.push({
@@ -150,7 +156,8 @@ export async function getAllCurrentPrices(): Promise<
           week_change: Math.round(weekChange * 1000) / 1000,
           week_change_pct: Math.round(weekChangePct * 100) / 100,
         });
-      } catch {
+      } catch (err) {
+        console.error(`[EIA] Error fetching ${fuelType}/${regionCode}:`, err);
         continue;
       }
     }
@@ -197,14 +204,8 @@ export function calculateVolatility(prices: PricePoint[], window = 52) {
   const avgPrice = recent.reduce((a, b) => a + b, 0) / recent.length;
   const current = recent[recent.length - 1];
 
-  const ma4 =
-    recent.length >= 4
-      ? recent.slice(-4).reduce((a, b) => a + b, 0) / 4
-      : current;
-  const ma13 =
-    recent.length >= 13
-      ? recent.slice(-13).reduce((a, b) => a + b, 0) / 13
-      : current;
+  const ma4 = recent.length >= 4 ? recent.slice(-4).reduce((a, b) => a + b, 0) / 4 : current;
+  const ma13 = recent.length >= 13 ? recent.slice(-13).reduce((a, b) => a + b, 0) / 13 : current;
 
   let trend: "rising" | "falling" | "stable" = "stable";
   if (ma4 > ma13 * 1.02) trend = "rising";
@@ -217,8 +218,7 @@ export function calculateVolatility(prices: PricePoint[], window = 52) {
       min: Math.round(Math.min(...recent) * 1000) / 1000,
       max: Math.round(Math.max(...recent) * 1000) / 1000,
     },
-    current_vs_52w_avg:
-      Math.round(((current - avgPrice) / avgPrice) * 100 * 100) / 100,
+    current_vs_52w_avg: Math.round(((current - avgPrice) / avgPrice) * 100 * 100) / 100,
     trend,
   };
 }

@@ -1,8 +1,6 @@
 import { getCurrentPrice } from "@/lib/eia-service";
-import {
-  calculateHedgePosition,
-  DEFAULT_ETF_PRICES,
-} from "@/lib/hedging-engine";
+import { calculateHedgePosition } from "@/lib/hedging-engine";
+import { getETFPrice } from "@/lib/alpha-vantage";
 
 export async function POST(req: Request) {
   const data = await req.json();
@@ -15,7 +13,7 @@ export async function POST(req: Request) {
 
   let etfPrice = data.current_etf_price;
   if (etfPrice == null) {
-    etfPrice = DEFAULT_ETF_PRICES[data.product_ticker] || 50.0;
+    etfPrice = await getETFPrice(data.product_ticker);
   }
 
   const position = calculateHedgePosition(

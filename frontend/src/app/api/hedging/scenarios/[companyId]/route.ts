@@ -1,10 +1,7 @@
 import { companyStore } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
-import {
-  calculateHedgePosition,
-  scenarioAnalysis,
-  DEFAULT_ETF_PRICES,
-} from "@/lib/hedging-engine";
+import { calculateHedgePosition, scenarioAnalysis } from "@/lib/hedging-engine";
+import { getETFPrice } from "@/lib/alpha-vantage";
 
 export async function GET(
   req: Request,
@@ -31,7 +28,7 @@ export async function GET(
 
   const fuelPrice =
     (await getCurrentPrice(fuelType, company.padd_region)) || 3.5;
-  const etfPrice = DEFAULT_ETF_PRICES[productTicker] || 50.0;
+  const etfPrice = await getETFPrice(productTicker);
 
   const position = calculateHedgePosition(
     monthlyGallons,

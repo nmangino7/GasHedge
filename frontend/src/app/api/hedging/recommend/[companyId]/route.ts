@@ -1,9 +1,7 @@
 import { companyStore } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
-import {
-  recommendStrategy,
-  DEFAULT_ETF_PRICES,
-} from "@/lib/hedging-engine";
+import { recommendStrategy } from "@/lib/hedging-engine";
+import { getAllETFPrices } from "@/lib/alpha-vantage";
 
 export async function GET(
   _req: Request,
@@ -32,11 +30,13 @@ export async function GET(
   const fuelPrice =
     (await getCurrentPrice(fuelType, company.padd_region)) || 3.5;
 
+  const etfPrices = await getAllETFPrices();
+
   const recommendations = recommendStrategy(
     fuelType,
     monthlyGallons,
     fuelPrice,
-    DEFAULT_ETF_PRICES
+    etfPrices
   );
 
   return Response.json({

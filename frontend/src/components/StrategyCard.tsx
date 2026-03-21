@@ -1,9 +1,9 @@
 import type { StrategyRecommendation } from "@/lib/types";
 
-const tierColors: Record<string, { bg: string; border: string; badge: string }> = {
-  conservative: { bg: "bg-blue-50", border: "border-blue-200", badge: "bg-blue-100 text-blue-700" },
-  moderate: { bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700" },
-  aggressive: { bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-100 text-orange-700" },
+const tierStyles: Record<string, { badge: string }> = {
+  conservative: { badge: "bg-blue-50 text-blue-700" },
+  moderate: { badge: "bg-gray-100 text-gray-700" },
+  aggressive: { badge: "bg-amber-50 text-amber-700" },
 };
 
 export default function StrategyCard({
@@ -15,47 +15,47 @@ export default function StrategyCard({
   onSelect?: () => void;
   selected?: boolean;
 }) {
-  const colors = tierColors[strategy.tier] || tierColors.moderate;
+  const styles = tierStyles[strategy.tier] || tierStyles.moderate;
   const pos = strategy.position;
 
   return (
     <div
-      className={`rounded-xl border-2 p-5 cursor-pointer transition-all ${colors.bg} ${
-        selected ? "border-emerald-500 ring-2 ring-emerald-200" : colors.border
+      className={`rounded-lg border p-5 cursor-pointer transition-all ${
+        selected ? "border-gray-900 bg-gray-50" : "border-gray-200 bg-white hover:border-gray-300"
       }`}
       onClick={onSelect}
     >
       <div className="flex items-center justify-between mb-3">
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${colors.badge}`}>
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${styles.badge}`}>
           {strategy.tier}
         </span>
-        <span className="text-sm font-medium text-gray-500">{pos.product_ticker}</span>
+        <span className="text-xs font-mono text-gray-500">{pos.product_ticker}</span>
       </div>
 
-      <div className="text-2xl font-bold text-slate-900 mb-1">
+      <div className="text-xl font-semibold text-gray-900 mb-3">
         {(strategy.hedge_ratio * 100).toFixed(0)}% Hedge
       </div>
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-gray-500">Investment Required</span>
-          <span className="font-semibold">${pos.dollar_notional.toLocaleString()}</span>
+          <span className="text-gray-500">Investment</span>
+          <span className="text-gray-900 font-medium">${pos.dollar_notional.toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Shares to Buy</span>
-          <span className="font-semibold">{pos.shares_needed.toLocaleString()}</span>
+          <span className="text-gray-500">Shares</span>
+          <span className="text-gray-900 font-medium">{pos.shares_needed.toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Annual ETF Expense</span>
-          <span className="font-semibold">${pos.annual_expense_cost.toLocaleString()}</span>
+          <span className="text-gray-500">Annual Expense</span>
+          <span className="text-gray-900 font-medium">${pos.annual_expense_cost.toLocaleString()}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Effective Coverage</span>
-          <span className="font-semibold">{(pos.effective_hedge_ratio * 100).toFixed(1)}%</span>
+          <span className="text-gray-500">Coverage</span>
+          <span className="text-gray-900 font-medium">{(pos.effective_hedge_ratio * 100).toFixed(1)}%</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-500">Correlation</span>
-          <span className="font-semibold">{(pos.correlation_to_retail * 100).toFixed(0)}%</span>
+          <span className="text-gray-900 font-medium">{(pos.correlation_to_retail * 100).toFixed(0)}%</span>
         </div>
       </div>
 

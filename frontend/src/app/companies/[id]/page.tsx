@@ -2,10 +2,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { companiesApi } from "@/lib/api";
+import { companiesApi, aiApi } from "@/lib/api";
 import type { Company, ExposureData, BenchmarkData } from "@/lib/types";
 import { COMPANY_TYPES, PADD_LABELS } from "@/lib/constants";
-import { Shield, FileText, DollarSign, AlertTriangle } from "lucide-react";
+import { Shield, FileText, MessageSquare, Loader2 } from "lucide-react";
 
 export default function CompanyDetailPage() {
   const params = useParams();
@@ -14,6 +14,9 @@ export default function CompanyDetailPage() {
   const [exposure, setExposure] = useState<ExposureData | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     if (!companyId) return;
@@ -28,108 +31,163 @@ export default function CompanyDetailPage() {
     }).finally(() => setLoading(false));
   }, [companyId]);
 
-  if (loading) return <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-48 mb-4"></div></div>;
-  if (!company) return <p className="text-gray-500">Company not found.</p>;
+  async function askAI() {
+    if (!aiQuestion.trim()) return;
+    setAiLoading(true);
+    try {
+      const data = await aiApi.ask(aiQuestion, companyId);
+      setAiResponse(data.response);
+    } catch {
+      setAiResponse("Unable to get response. Check ANTHROPIC_API_KEY.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  if (loading) return <div className="animate-pulse"><div className="h-6 bg-gray-100 rounded w-48 mb-4"></div></div>;
+  if (!company) return <p className="text-sm text-gray-500">Company not found.</p>;
 
   const typeLabel = COMPANY_TYPES.find((t) => t.value === company.company_type)?.label || company.company_type;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">{company.name}</h1>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-gray-500">{typeLabel}</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-              company.status === "active" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+          <h1 className="text-2xl font-semibold text-gray-900">{company.name}</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm text-gray-500">{typeLabel}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              company.status === "active" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"
             }`}>{company.status}</span>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Link href={`/hedging/${company.id}`}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium">
-            <Shield className="h-4 w-4" /> Hedging Strategies
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium">
+            <Shield className="h-3.5 w-3.5" /> Hedging Strategies
           </Link>
           <Link href={`/reports/${company.id}`}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm font-medium">
-            <FileText className="h-4 w-4" /> Generate Report
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium">
+            <FileText className="h-3.5 w-3.5" /> Report
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         {/* Company Info */}
-        <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Company Profile</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Contact</span><span>{company.contact_name}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{company.contact_email}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">State</span><span>{company.address_state}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Region</span><span>{PADD_LABELS[company.padd_region]}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Fleet Size</span><span>{company.fleet_size}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Fuel Type</span><span className="capitalize">{company.fuel_type}</span></div>
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Company Profile</h2>
+          <div className="space-y-2.5 text-sm">
+            <div className="flex justify-between"><span className="text-gray-500">Contact</span><span className="text-gray-900">{company.contact_name}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="text-gray-900">{company.contact_email}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">State</span><span className="text-gray-900">{company.address_state}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Region</span><span className="text-gray-900">{PADD_LABELS[company.padd_region]}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Fleet Size</span><span className="text-gray-900">{company.fleet_size}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Fuel Type</span><span className="text-gray-900 capitalize">{company.fuel_type}</span></div>
           </div>
         </div>
 
         {/* Fuel Exposure */}
-        <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Fuel Exposure</h2>
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Fuel Exposure</h2>
           {exposure ? (
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Monthly Cost</span><span className="font-semibold text-lg">${exposure.monthly_fuel_cost.toLocaleString()}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Annual Cost</span><span className="font-semibold text-lg text-red-600">${exposure.annual_fuel_cost.toLocaleString()}</span></div>
+            <div className="space-y-2.5 text-sm">
+              <div className="flex justify-between"><span className="text-gray-500">Monthly Cost</span><span className="text-gray-900 font-semibold text-lg">${exposure.monthly_fuel_cost.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Annual Cost</span><span className="text-red-700 font-semibold text-lg">${exposure.annual_fuel_cost.toLocaleString()}</span></div>
               {exposure.fuel_pct_revenue && (
-                <div className="flex justify-between"><span className="text-gray-500">% of Revenue</span><span className="font-semibold">{exposure.fuel_pct_revenue}%</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">% of Revenue</span><span className="text-gray-900 font-medium">{exposure.fuel_pct_revenue}%</span></div>
               )}
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">If Prices Rise...</p>
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-[11px] font-medium text-gray-400 uppercase mb-2">If Prices Rise</p>
                 {exposure.scenarios.map((s) => (
-                  <div key={s.label} className="flex justify-between py-1">
-                    <span className="text-gray-500">{s.label}</span>
-                    <span className="text-red-500 font-medium">+${s.additional_annual_cost.toLocaleString()}/yr</span>
+                  <div key={s.label} className="flex justify-between py-0.5">
+                    <span className="text-gray-500 text-xs">{s.label}</span>
+                    <span className="text-red-600 text-xs font-medium">+${s.additional_annual_cost.toLocaleString()}/yr</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <p className="text-gray-400 text-sm">Unable to calculate exposure. Check EIA API key.</p>
+            <p className="text-sm text-gray-500">Unable to calculate exposure. Verify EIA API key is set.</p>
           )}
         </div>
 
         {/* Benchmark */}
-        <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Industry Benchmark</h2>
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Industry Benchmark</h2>
           {benchmark ? (
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Your Usage</span>
-                <span className="font-semibold">{benchmark.company_monthly_gallons.toLocaleString()} gal/mo</span>
+                <span className="text-gray-900 font-medium">{benchmark.company_monthly_gallons.toLocaleString()} gal/mo</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Industry Avg</span>
-                <span>{benchmark.industry_avg_monthly_gallons.toLocaleString()} gal/mo</span>
+                <span className="text-gray-900">{benchmark.industry_avg_monthly_gallons.toLocaleString()} gal/mo</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Comparison</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  benchmark.comparison === "above_average" ? "bg-red-100 text-red-700" :
-                  benchmark.comparison === "below_average" ? "bg-green-100 text-green-700" :
-                  "bg-blue-100 text-blue-700"
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                  benchmark.comparison === "above_average" ? "bg-red-50 text-red-700" :
+                  benchmark.comparison === "below_average" ? "bg-green-50 text-green-700" :
+                  "bg-blue-50 text-blue-700"
                 }`}>{benchmark.comparison.replace("_", " ")}</span>
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-400">
-                  Industry range: {benchmark.industry_range.low.toLocaleString()} - {benchmark.industry_range.high.toLocaleString()} gal/mo
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-500">
+                  Range: {benchmark.industry_range.low.toLocaleString()} - {benchmark.industry_range.high.toLocaleString()} gal/mo
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 mt-0.5">
                   Avg fuel as % of revenue: {benchmark.industry_avg_fuel_pct_revenue}%
                 </p>
               </div>
             </div>
           ) : (
-            <p className="text-gray-400 text-sm">No benchmark data available for this company type.</p>
+            <p className="text-sm text-gray-500">No benchmark data for this company type.</p>
           )}
         </div>
+      </div>
+
+      {/* Notes Section */}
+      {company.notes && (
+        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Notes & Context</h2>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{company.notes}</p>
+        </div>
+      )}
+
+      {/* AI Strategy Assistant */}
+      <div className="bg-white rounded-lg border border-gray-200 p-5">
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <MessageSquare className="h-3.5 w-3.5" /> AI Strategy Assistant
+        </h2>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={aiQuestion}
+            onChange={(e) => setAiQuestion(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && askAI()}
+            placeholder="Ask about hedging strategies, fuel exposure, market conditions..."
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 focus:ring-1 focus:ring-gray-400 focus:border-gray-400 outline-none"
+          />
+          <button
+            onClick={askAI}
+            disabled={aiLoading}
+            className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800 disabled:opacity-50"
+          >
+            {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ask"}
+          </button>
+        </div>
+        {aiResponse && (
+          <div className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-md p-4 max-h-80 overflow-y-auto leading-relaxed">
+            {aiResponse}
+          </div>
+        )}
+        {!aiResponse && (
+          <p className="text-xs text-gray-400">Powered by Claude. Ask questions specific to this company&apos;s fuel exposure and hedging options.</p>
+        )}
       </div>
     </div>
   );

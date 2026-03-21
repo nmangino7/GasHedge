@@ -34,7 +34,7 @@ export default function Dashboard() {
       setDieselHistory(dieselHist.prices);
       setVolatility(vol);
     } catch {
-      setError("Unable to load price data. Make sure the backend is running and EIA_API_KEY is configured.");
+      setError("Unable to load price data. Check that EIA_API_KEY is configured in Vercel environment variables.");
     } finally {
       setLoading(false);
     }
@@ -44,41 +44,37 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Fuel Price Dashboard</h1>
-          <p className="text-gray-500 mt-1">Real-time fuel prices from the U.S. Energy Information Administration</p>
-        </div>
-        {volatility && (
-          <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
-            volatility.trend === "rising" ? "bg-red-50 text-red-700" :
-            volatility.trend === "falling" ? "bg-green-50 text-green-700" :
-            "bg-gray-50 text-gray-700"
-          }`}>
-            <span className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Market: {volatility.trend.charAt(0).toUpperCase() + volatility.trend.slice(1)} | Vol: {(volatility.annualized_volatility * 100).toFixed(1)}%
-            </span>
-          </div>
-        )}
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-gray-900">Fuel Price Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Real-time fuel prices from the U.S. Energy Information Administration</p>
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-800">Connection Issue</p>
-            <p className="text-sm text-yellow-600">{error}</p>
+      {volatility && (
+        <div className="mb-6">
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${
+            volatility.trend === "rising" ? "bg-red-50 text-red-700" :
+            volatility.trend === "falling" ? "bg-green-50 text-green-700" :
+            "bg-gray-100 text-gray-600"
+          }`}>
+            <TrendingUp className="h-3.5 w-3.5" />
+            Market: {volatility.trend.charAt(0).toUpperCase() + volatility.trend.slice(1)} | Volatility: {(volatility.annualized_volatility * 100).toFixed(1)}%
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
+          <p className="text-sm text-amber-800">{error}</p>
         </div>
       )}
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           {[1, 2].map((i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-24 mb-3"></div>
-              <div className="h-8 bg-gray-200 rounded w-32"></div>
+            <div key={i} className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
+              <div className="h-3 bg-gray-100 rounded w-20 mb-3"></div>
+              <div className="h-7 bg-gray-100 rounded w-28"></div>
             </div>
           ))}
         </div>
@@ -92,7 +88,7 @@ export default function Dashboard() {
 
           {prices.length > 2 && (
             <div className="mb-8">
-              <h2 className="text-lg font-semibold text-slate-800 mb-4">Regional Prices</h2>
+              <h2 className="text-sm font-medium text-gray-900 mb-3">Regional Prices</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 {prices.filter((p) => p.region !== "NUS").map((p) => (
                   <PriceCard key={`${p.fuel_type}-${p.region}`} price={p} />
@@ -102,14 +98,14 @@ export default function Dashboard() {
           )}
 
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm font-medium text-gray-500">Timeframe:</span>
+            <span className="text-xs font-medium text-gray-500">Timeframe:</span>
             {[1, 3, 5].map((y) => (
               <button
                 key={y}
                 onClick={() => setHistoryYears(y)}
-                className={`px-3 py-1 text-sm rounded-lg ${
+                className={`px-3 py-1 text-xs rounded-md ${
                   historyYears === y
-                    ? "bg-slate-900 text-white"
+                    ? "bg-gray-900 text-white"
                     : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                 }`}
               >
