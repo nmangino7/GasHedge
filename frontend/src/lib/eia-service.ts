@@ -1,4 +1,5 @@
 const EIA_BASE_URL = "https://api.eia.gov/v2/petroleum/pri/gnd/data/";
+const FETCH_TIMEOUT_MS = 8000; // 8 second timeout for EIA API calls
 
 const REGION_MAP: Record<string, string> = {
   US: "NUS", "East Coast": "R10", Midwest: "R20", "Gulf Coast": "R30",
@@ -21,7 +22,7 @@ export const REGION_LABELS: Record<string, string> = {
 };
 
 // Fallback prices if EIA API fails
-const FALLBACK_PRICES: Record<string, number> = {
+export const FALLBACK_PRICES: Record<string, number> = {
   gasoline: 3.50,
   diesel: 3.90,
 };
@@ -60,9 +61,15 @@ export async function fetchPrices(
   });
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
     const res = await fetch(`${EIA_BASE_URL}?${params}`, {
       cache: "no-store",
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
+
     if (!res.ok) {
       console.error(`[EIA] API returned ${res.status}: ${res.statusText}`);
       return [];
@@ -88,14 +95,13 @@ export async function fetchPrices(
 export async function getCurrentPrice(
   fuelType: string,
   region: string
-): Promise<number | null> {
+): Promise<number> {
   const now = new Date();
   const end = now.toISOString().slice(0, 10);
   const start = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
   const prices = await fetchPrices(fuelType, region, start, end);
   if (prices.length > 0) return prices[prices.length - 1].value;
-  // Return fallback price instead of null
-  return FALLBACK_PRICES[fuelType] || null;
+  return FALLBACK_PRICES[fuelType] || 3.50;
 }
 
 export async function getPriceHistory(
@@ -112,57 +118,56 @@ export async function getPriceHistory(
 }
 
 export async function getAllCurrentPrices() {
-  const results: {
-    fuel_type: string;
-    region: string;
-    region_label: string;
-    price_per_gallon: number;
-    week_change: number;
-    week_change_pct: number;
-  }[] = [];
-
+  // Fetch all 12 region/fuel combos in parallel
+  const combos: { fuelType: string; regionCode: string }[] = [];
   for (const fuelType of ["gasoline", "diesel"]) {
     for (const regionCode of ["NUS", "R10", "R20", "R30", "R40", "R50"]) {
-      try {
-        const now = new Date();
-        const end = now.toISOString().slice(0, 10);
-        const start = new Date(now.getTime() - 30 * 86400000)
-          .toISOString()
-          .slice(0, 10);
-        const history = await fetchPrices(fuelType, regionCode, start, end);
-
-        let price: number;
-        let weekChange = 0;
-        let weekChangePct = 0;
-
-        if (history.length > 0) {
-          price = history[history.length - 1].value;
-          if (history.length >= 2) {
-            weekChange = history[history.length - 1].value - history[history.length - 2].value;
-            if (history[history.length - 2].value > 0) {
-              weekChangePct = (weekChange / history[history.length - 2].value) * 100;
-            }
-          }
-        } else {
-          // Use fallback price
-          price = FALLBACK_PRICES[fuelType] || 3.50;
-        }
-
-        results.push({
-          fuel_type: fuelType,
-          region: regionCode,
-          region_label: REGION_LABELS[regionCode] || regionCode,
-          price_per_gallon: Math.round(price * 1000) / 1000,
-          week_change: Math.round(weekChange * 1000) / 1000,
-          week_change_pct: Math.round(weekChangePct * 100) / 100,
-        });
-      } catch (err) {
-        console.error(`[EIA] Error fetching ${fuelType}/${regionCode}:`, err);
-        continue;
-      }
+      combos.push({ fuelType, regionCode });
     }
   }
-  return results;
+
+  const now = new Date();
+  const end = now.toISOString().slice(0, 10);
+  const start = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+
+  const settled = await Promise.allSettled(
+    combos.map(({ fuelType, regionCode }) =>
+      fetchPrices(fuelType, regionCode, start, end).then((history) => ({
+        fuelType,
+        regionCode,
+        history,
+      }))
+    )
+  );
+
+  return combos.map((combo, i) => {
+    const result = settled[i];
+    let price: number;
+    let weekChange = 0;
+    let weekChangePct = 0;
+
+    if (result.status === "fulfilled" && result.value.history.length > 0) {
+      const history = result.value.history;
+      price = history[history.length - 1].value;
+      if (history.length >= 2) {
+        weekChange = history[history.length - 1].value - history[history.length - 2].value;
+        if (history[history.length - 2].value > 0) {
+          weekChangePct = (weekChange / history[history.length - 2].value) * 100;
+        }
+      }
+    } else {
+      price = FALLBACK_PRICES[combo.fuelType] || 3.50;
+    }
+
+    return {
+      fuel_type: combo.fuelType,
+      region: combo.regionCode,
+      region_label: REGION_LABELS[combo.regionCode] || combo.regionCode,
+      price_per_gallon: Math.round(price * 1000) / 1000,
+      week_change: Math.round(weekChange * 1000) / 1000,
+      week_change_pct: Math.round(weekChangePct * 100) / 100,
+    };
+  });
 }
 
 export function calculateVolatility(prices: PricePoint[], window = 52) {

@@ -5,40 +5,40 @@ import {
   getPriceHistory,
   calculateVolatility,
 } from "@/lib/eia-service";
-import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient, AI_MODEL } from "@/lib/ai-client";
 
 const SYSTEM_PROMPT = `You are a fuel cost management advisor for small businesses.
 You provide recommendations using securities-based products (ETFs like UGA, USO, BNO, UNL).
 Focus on business impact and explain concepts simply for business owners.`;
 
 export async function GET() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!apiKey) {
-    return Response.json({
-      response: "Claude API key not configured.",
-      disclaimers: DISCLAIMERS,
-    });
-  }
-
-  const gasPrice = (await getCurrentPrice("gasoline", "NUS")) || 3.5;
-  const dieselPrice = (await getCurrentPrice("diesel", "NUS")) || 3.9;
-
-  const gasHistory = await getPriceHistory("gasoline", "NUS", 1);
-  const dieselHistory = await getPriceHistory("diesel", "NUS", 1);
-
-  const gasVol = calculateVolatility(gasHistory);
-  const dieselVol = calculateVolatility(dieselHistory);
-
-  const priceData = {
-    gasoline: { current: gasPrice, trend: gasVol.trend },
-    diesel: { current: dieselPrice, trend: dieselVol.trend },
-  };
-
   try {
-    const client = new Anthropic({ apiKey });
+    const client = createAnthropicClient();
+
+    if (!client) {
+      return Response.json({
+        response:
+          "Claude API key not configured. Add ANTHROPIC_API_KEY (or CLAUDE_API_KEY) to your Vercel environment variables.",
+        disclaimers: DISCLAIMERS,
+      });
+    }
+
+    const gasPrice = await getCurrentPrice("gasoline", "NUS");
+    const dieselPrice = await getCurrentPrice("diesel", "NUS");
+
+    const gasHistory = await getPriceHistory("gasoline", "NUS", 1);
+    const dieselHistory = await getPriceHistory("diesel", "NUS", 1);
+
+    const gasVol = calculateVolatility(gasHistory);
+    const dieselVol = calculateVolatility(dieselHistory);
+
+    const priceData = {
+      gasoline: { current: gasPrice, trend: gasVol.trend },
+      diesel: { current: dieselPrice, trend: dieselVol.trend },
+    };
+
     const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: AI_MODEL,
       max_tokens: 1000,
       system: SYSTEM_PROMPT,
       messages: [
@@ -62,8 +62,9 @@ Please provide a 2-3 paragraph market outlook covering:
       disclaimers: DISCLAIMERS,
     });
   } catch (e) {
+    console.error("[AI Market Outlook] Error:", e);
     return Response.json({
-      response: `Unable to generate outlook: ${e instanceof Error ? e.message : String(e)}`,
+      response: `Error: ${e instanceof Error ? e.message : String(e)}`,
       disclaimers: DISCLAIMERS,
     });
   }

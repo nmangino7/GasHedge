@@ -1,7 +1,7 @@
 export const maxDuration = 30;
 import { companyStore, DISCLAIMERS } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
-import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient, AI_MODEL } from "@/lib/ai-client";
 
 const SYSTEM_PROMPT = `You are a fuel cost management advisor for small businesses.
 You provide recommendations using securities-based products (ETFs like UGA, USO, BNO, UNL)
@@ -16,26 +16,24 @@ IMPORTANT CONSTRAINTS:
 - Never make specific buy/sell recommendations — frame as analysis and advisory`;
 
 export async function POST(req: Request) {
-  const data = await req.json();
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!apiKey) {
-    return Response.json({
-      response:
-        "Claude API key not configured. Please add ANTHROPIC_API_KEY to your Vercel environment variables.",
-      disclaimers: DISCLAIMERS,
-    });
-  }
-
   try {
+    const data = await req.json();
+    const client = createAnthropicClient();
+
+    if (!client) {
+      return Response.json({
+        response:
+          "Claude API key not configured. Add ANTHROPIC_API_KEY (or CLAUDE_API_KEY) to your Vercel environment variables, then redeploy.",
+        disclaimers: DISCLAIMERS,
+      });
+    }
+
     let contextStr = "";
     if (data.company_id) {
       const company = companyStore.get(data.company_id);
       if (company) {
-        const gasPrice =
-          (await getCurrentPrice("gasoline", company.padd_region)) || 3.5;
-        const dieselPrice =
-          (await getCurrentPrice("diesel", company.padd_region)) || 3.9;
+        const gasPrice = await getCurrentPrice("gasoline", company.padd_region);
+        const dieselPrice = await getCurrentPrice("diesel", company.padd_region);
         contextStr = `\n\nCOMPANY CONTEXT:\n${JSON.stringify(
           {
             name: company.name,
@@ -55,9 +53,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: AI_MODEL,
       max_tokens: 1500,
       system: SYSTEM_PROMPT,
       messages: [
@@ -72,7 +69,7 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("[AI Ask] Error:", e);
     return Response.json({
-      response: `Unable to answer: ${e instanceof Error ? e.message : String(e)}`,
+      response: `Error: ${e instanceof Error ? e.message : String(e)}`,
       disclaimers: DISCLAIMERS,
     });
   }

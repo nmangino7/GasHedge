@@ -6,7 +6,7 @@ import {
   recommendStrategy,
   DEFAULT_ETF_PRICES,
 } from "@/lib/hedging-engine";
-import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropicClient, AI_MODEL } from "@/lib/ai-client";
 
 const SYSTEM_PROMPT = `You are a fuel cost management advisor for small businesses.
 You provide recommendations using securities-based products (ETFs like UGA, USO, BNO, UNL)
@@ -25,52 +25,49 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
-  const { companyId } = await params;
-  const company = companyStore.get(Number(companyId));
-  if (!company)
-    return Response.json({ detail: "Company not found" }, { status: 404 });
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return Response.json({
-      response:
-        "Claude API key not configured. Please add ANTHROPIC_API_KEY to your environment variables.",
-      disclaimers: DISCLAIMERS,
-    });
-  }
-
-  const fuelType =
-    company.fuel_type === "diesel" ? "diesel" : "gasoline";
-  const monthlyGallons =
-    fuelType === "diesel"
-      ? company.monthly_gallons_diesel || 0
-      : company.monthly_gallons_gasoline || 0;
-
-  const gasPrice =
-    (await getCurrentPrice("gasoline", company.padd_region)) || 3.5;
-  const dieselPrice =
-    (await getCurrentPrice("diesel", company.padd_region)) || 3.9;
-  const fuelPrice = fuelType === "gasoline" ? gasPrice : dieselPrice;
-
-  const exposure = calculateExposure(
-    company.monthly_gallons_gasoline || 0,
-    company.monthly_gallons_diesel || 0,
-    gasPrice,
-    dieselPrice,
-    company.annual_revenue
-  );
-
-  const strategies = recommendStrategy(
-    fuelType,
-    monthlyGallons,
-    fuelPrice,
-    DEFAULT_ETF_PRICES
-  );
-
   try {
-    const client = new Anthropic({ apiKey });
+    const { companyId } = await params;
+    const company = companyStore.get(Number(companyId));
+    if (!company)
+      return Response.json({ detail: "Company not found" }, { status: 404 });
+
+    const client = createAnthropicClient();
+    if (!client) {
+      return Response.json({
+        response:
+          "Claude API key not configured. Add ANTHROPIC_API_KEY (or CLAUDE_API_KEY) to your Vercel environment variables, then redeploy.",
+        disclaimers: DISCLAIMERS,
+      });
+    }
+
+    const fuelType =
+      company.fuel_type === "diesel" ? "diesel" : "gasoline";
+    const monthlyGallons =
+      fuelType === "diesel"
+        ? company.monthly_gallons_diesel || 0
+        : company.monthly_gallons_gasoline || 0;
+
+    const gasPrice = await getCurrentPrice("gasoline", company.padd_region);
+    const dieselPrice = await getCurrentPrice("diesel", company.padd_region);
+    const fuelPrice = fuelType === "gasoline" ? gasPrice : dieselPrice;
+
+    const exposure = calculateExposure(
+      company.monthly_gallons_gasoline || 0,
+      company.monthly_gallons_diesel || 0,
+      gasPrice,
+      dieselPrice,
+      company.annual_revenue
+    );
+
+    const strategies = recommendStrategy(
+      fuelType,
+      monthlyGallons,
+      fuelPrice,
+      DEFAULT_ETF_PRICES
+    );
+
     const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: AI_MODEL,
       max_tokens: 2000,
       system: SYSTEM_PROMPT,
       messages: [
@@ -106,8 +103,9 @@ Please provide:
       disclaimers: DISCLAIMERS,
     });
   } catch (e) {
+    console.error("[AI Recommend] Error:", e);
     return Response.json({
-      response: `Unable to generate AI recommendation: ${e instanceof Error ? e.message : String(e)}`,
+      response: `Error: ${e instanceof Error ? e.message : String(e)}`,
       disclaimers: DISCLAIMERS,
     });
   }
