@@ -22,42 +22,42 @@ export async function POST(req: Request) {
   if (!apiKey) {
     return Response.json({
       response:
-        "Claude API key not configured. Please add ANTHROPIC_API_KEY to your environment variables.",
+        "Claude API key not configured. Please add ANTHROPIC_API_KEY to your Vercel environment variables.",
       disclaimers: DISCLAIMERS,
     });
   }
 
-  let contextStr = "";
-  if (data.company_id) {
-    const company = companyStore.get(data.company_id);
-    if (company) {
-      const gasPrice =
-        (await getCurrentPrice("gasoline", company.padd_region)) || 3.5;
-      const dieselPrice =
-        (await getCurrentPrice("diesel", company.padd_region)) || 3.9;
-      contextStr = `\n\nCOMPANY CONTEXT:\n${JSON.stringify(
-        {
-          name: company.name,
-          company_type: company.company_type,
-          fleet_size: company.fleet_size,
-          fuel_type: company.fuel_type,
-          padd_region: company.padd_region,
-          monthly_gallons_gasoline: company.monthly_gallons_gasoline,
-          monthly_gallons_diesel: company.monthly_gallons_diesel,
-          annual_revenue: company.annual_revenue,
-          current_gas_price: gasPrice,
-          current_diesel_price: dieselPrice,
-        },
-        null,
-        2
-      )}`;
-    }
-  }
-
   try {
+    let contextStr = "";
+    if (data.company_id) {
+      const company = companyStore.get(data.company_id);
+      if (company) {
+        const gasPrice =
+          (await getCurrentPrice("gasoline", company.padd_region)) || 3.5;
+        const dieselPrice =
+          (await getCurrentPrice("diesel", company.padd_region)) || 3.9;
+        contextStr = `\n\nCOMPANY CONTEXT:\n${JSON.stringify(
+          {
+            name: company.name,
+            company_type: company.company_type,
+            fleet_size: company.fleet_size,
+            fuel_type: company.fuel_type,
+            padd_region: company.padd_region,
+            monthly_gallons_gasoline: company.monthly_gallons_gasoline,
+            monthly_gallons_diesel: company.monthly_gallons_diesel,
+            annual_revenue: company.annual_revenue,
+            current_gas_price: gasPrice,
+            current_diesel_price: dieselPrice,
+          },
+          null,
+          2
+        )}`;
+      }
+    }
+
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1500,
       system: SYSTEM_PROMPT,
       messages: [
@@ -70,6 +70,7 @@ export async function POST(req: Request) {
       disclaimers: DISCLAIMERS,
     });
   } catch (e) {
+    console.error("[AI Ask] Error:", e);
     return Response.json({
       response: `Unable to answer: ${e instanceof Error ? e.message : String(e)}`,
       disclaimers: DISCLAIMERS,

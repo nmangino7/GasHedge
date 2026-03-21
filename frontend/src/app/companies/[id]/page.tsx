@@ -5,7 +5,7 @@ import Link from "next/link";
 import { companiesApi, aiApi } from "@/lib/api";
 import type { Company, ExposureData, BenchmarkData } from "@/lib/types";
 import { COMPANY_TYPES, PADD_LABELS } from "@/lib/constants";
-import { Shield, FileText, MessageSquare, Loader2, AlertTriangle } from "lucide-react";
+import { Shield, FileText, MessageSquare, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function CompanyDetailPage() {
   const params = useParams();
@@ -15,6 +15,10 @@ export default function CompanyDetailPage() {
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exposureError, setExposureError] = useState<string | null>(null);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
+  const [exposureLoading, setExposureLoading] = useState(true);
+  const [benchmarkLoading, setBenchmarkLoading] = useState(true);
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -38,18 +42,31 @@ export default function CompanyDetailPage() {
 
     // Load exposure and benchmark in background — don't block page
     setLoading(false);
-    companiesApi.getExposure(companyId).then(setExposure).catch(() => {});
-    companiesApi.getBenchmark(companyId).then(setBenchmark).catch(() => {});
+    setExposureLoading(true);
+    setExposureError(null);
+    setBenchmarkLoading(true);
+    setBenchmarkError(null);
+
+    companiesApi.getExposure(companyId)
+      .then(setExposure)
+      .catch((e) => setExposureError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setExposureLoading(false));
+
+    companiesApi.getBenchmark(companyId)
+      .then(setBenchmark)
+      .catch((e) => setBenchmarkError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBenchmarkLoading(false));
   }
 
   async function askAI() {
     if (!aiQuestion.trim()) return;
     setAiLoading(true);
+    setAiResponse(null);
     try {
       const data = await aiApi.ask(aiQuestion, companyId);
       setAiResponse(data.response);
-    } catch {
-      setAiResponse("Unable to get response. Check ANTHROPIC_API_KEY.");
+    } catch (e) {
+      setAiResponse(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setAiLoading(false);
     }
@@ -74,6 +91,9 @@ export default function CompanyDetailPage() {
             <p className="text-sm text-red-700">{error}</p>
           </div>
         </div>
+        <button onClick={loadCompany} className="mt-3 flex items-center gap-1.5 text-sm text-red-700 hover:text-red-900 font-medium">
+          <RefreshCw className="h-3.5 w-3.5" /> Retry
+        </button>
       </div>
     );
   }
@@ -125,7 +145,16 @@ export default function CompanyDetailPage() {
         {/* Fuel Exposure */}
         <div className="bg-white rounded-lg border border-gray-200 p-5">
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Fuel Exposure</h2>
-          {exposure ? (
+          {exposureLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading exposure data...
+            </div>
+          ) : exposureError ? (
+            <div className="text-xs text-red-600 bg-red-50 rounded p-3">
+              <p className="font-medium mb-1">Failed to load exposure</p>
+              <p className="text-red-500">{exposureError}</p>
+            </div>
+          ) : exposure ? (
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Monthly Cost</span><span className="text-gray-900 font-semibold text-lg">${exposure.monthly_fuel_cost.toLocaleString()}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Annual Cost</span><span className="text-red-700 font-semibold text-lg">${exposure.annual_fuel_cost.toLocaleString()}</span></div>
@@ -142,17 +171,22 @@ export default function CompanyDetailPage() {
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading exposure data...
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* Benchmark */}
         <div className="bg-white rounded-lg border border-gray-200 p-5">
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Industry Benchmark</h2>
-          {benchmark ? (
+          {benchmarkLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading benchmark...
+            </div>
+          ) : benchmarkError ? (
+            <div className="text-xs text-red-600 bg-red-50 rounded p-3">
+              <p className="font-medium mb-1">Failed to load benchmark</p>
+              <p className="text-red-500">{benchmarkError}</p>
+            </div>
+          ) : benchmark ? (
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Your Usage</span>
@@ -179,11 +213,7 @@ export default function CompanyDetailPage() {
                 </p>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-gray-400">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading benchmark...
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -217,12 +247,19 @@ export default function CompanyDetailPage() {
             {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ask"}
           </button>
         </div>
+        {aiLoading && (
+          <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking...
+          </div>
+        )}
         {aiResponse && (
-          <div className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-md p-4 max-h-80 overflow-y-auto leading-relaxed">
+          <div className={`text-sm whitespace-pre-wrap rounded-md p-4 max-h-80 overflow-y-auto leading-relaxed ${
+            aiResponse.startsWith("Error:") ? "bg-red-50 text-red-700" : "bg-gray-50 text-gray-700"
+          }`}>
             {aiResponse}
           </div>
         )}
-        {!aiResponse && (
+        {!aiResponse && !aiLoading && (
           <p className="text-xs text-gray-400">Powered by Claude. Ask questions specific to this company&apos;s fuel exposure and hedging options.</p>
         )}
       </div>
