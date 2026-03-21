@@ -1,0 +1,130 @@
+{
+  "industry_profiles": {
+    "landscaping": {
+      "label": "Landscaping / Lawn Care",
+      "fuel_type": "gasoline",
+      "gallons_per_unit_per_month": { "low": 150, "mid": 225, "high": 300 },
+      "unit_label": "crew",
+      "fuel_pct_revenue": { "low": 0.05, "mid": 0.08, "high": 0.12 },
+      "typical_fleet_size": { "low": 2, "high": 10 },
+      "vehicle_types": ["pickup_truck", "mower_trailer"],
+      "description": "Includes mowers, trimmers, blowers, trucks, and travel between job sites"
+    },
+    "trucking_local": {
+      "label": "Local / Regional Trucking",
+      "fuel_type": "diesel",
+      "gallons_per_unit_per_month": { "low": 1000, "mid": 2000, "high": 3000 },
+      "unit_label": "truck",
+      "fuel_pct_revenue": { "low": 0.20, "mid": 0.30, "high": 0.40 },
+      "typical_fleet_size": { "low": 3, "high": 25 },
+      "vehicle_types": ["box_truck", "flatbed", "semi"],
+      "description": "Regional delivery and hauling within 250-mile radius"
+    },
+    "trucking_longhaul": {
+      "label": "Long-Haul Trucking",
+      "fuel_type": "diesel",
+      "gallons_per_unit_per_month": { "low": 5000, "mid": 7500, "high": 10000 },
+      "unit_label": "truck",
+      "fuel_pct_revenue": { "low": 0.25, "mid": 0.35, "high": 0.45 },
+      "typical_fleet_size": { "low": 1, "high": 15 },
+      "vehicle_types": ["semi", "tanker"],
+      "description": "Cross-country freight, 10,000+ miles per month per truck"
+    },
+    "delivery": {
+      "label": "Delivery / Last Mile",
+      "fuel_type": "gasoline",
+      "gallons_per_unit_per_month": { "low": 200, "mid": 350, "high": 500 },
+      "unit_label": "vehicle",
+      "fuel_pct_revenue": { "low": 0.08, "mid": 0.12, "high": 0.18 },
+      "typical_fleet_size": { "low": 5, "high": 50 },
+      "vehicle_types": ["van", "pickup_truck", "box_truck"],
+      "description": "Local delivery services, courier, last-mile logistics"
+    },
+    "construction": {
+      "label": "Construction",
+      "fuel_type": "diesel",
+      "gallons_per_unit_per_month": { "low": 500, "mid": 1000, "high": 2000 },
+      "unit_label": "crew",
+      "fuel_pct_revenue": { "low": 0.04, "mid": 0.07, "high": 0.10 },
+      "typical_fleet_size": { "low": 3, "high": 20 },
+      "vehicle_types": ["pickup_truck", "dump_truck", "heavy_equipment"],
+      "description": "Equipment operation and crew transportation"
+    }
+  },
+  "hedging_products": {
+    "UGA": {
+      "name": "United States Gasoline Fund",
+      "expense_ratio": 0.0097,
+      "benchmark": "RBOB Gasoline near-month futures",
+      "fuel_correlation": "gasoline",
+      "tax_form": "K-1",
+      "structure": "commodity_pool",
+      "description": "Tracks the daily price movements of RBOB gasoline delivered to the New York harbor"
+    },
+    "USO": {
+      "name": "United States Oil Fund",
+      "expense_ratio": 0.0081,
+      "benchmark": "WTI Crude Oil near-month futures",
+      "fuel_correlation": "crude_oil",
+      "tax_form": "K-1",
+      "structure": "commodity_pool",
+      "description": "Tracks the daily price movements of WTI light sweet crude oil"
+    },
+    "BNO": {
+      "name": "United States Brent Oil Fund",
+      "expense_ratio": 0.0090,
+      "benchmark": "Brent Crude Oil near-month futures",
+      "fuel_correlation": "crude_oil",
+      "tax_form": "K-1",
+      "structure": "commodity_pool",
+      "description": "Tracks the daily price movements of Brent crude oil"
+    },
+    "UNL": {
+      "name": "United States 12 Month Natural Gas Fund",
+      "expense_ratio": 0.0090,
+      "benchmark": "Natural Gas futures (12-month strip)",
+      "fuel_correlation": "natural_gas",
+      "tax_form": "K-1",
+      "structure": "commodity_pool",
+      "description": "Tracks near-month and next 11 months natural gas futures contracts"
+    }
+  },
+  "state_to_padd": {
+    "CT": "R10", "ME": "R10", "MA": "R10", "NH": "R10", "RI": "R10", "VT": "R10",
+    "DE": "R10", "DC": "R10", "FL": "R10", "GA": "R10", "MD": "R10", "NC": "R10",
+    "NJ": "R10", "NY": "R10", "PA": "R10", "SC": "R10", "VA": "R10", "WV": "R10",
+    "IL": "R20", "IN": "R20", "IA": "R20", "KS": "R20", "KY": "R20", "MI": "R20",
+    "MN": "R20", "MO": "R20", "NE": "R20", "ND": "R20", "OH": "R20", "OK": "R20",
+    "SD": "R20", "TN": "R20", "WI": "R20",
+    "AL": "R30", "AR": "R30", "LA": "R30", "MS": "R30", "NM": "R30", "TX": "R30",
+    "CO": "R40", "ID": "R40", "MT": "R40", "UT": "R40", "WY": "R40",
+    "AK": "R50", "AZ": "R50", "CA": "R50", "HI": "R50", "NV": "R50", "OR": "R50", "WA": "R50"
+  },
+  "padd_labels": {
+    "R10": "East Coast (PADD 1)",
+    "R20": "Midwest (PADD 2)",
+    "R30": "Gulf Coast (PADD 3)",
+    "R40": "Rocky Mountain (PADD 4)",
+    "R50": "West Coast (PADD 5)",
+    "NUS": "U.S. Average"
+  },
+  "fee_structures": {
+    "flat": {
+      "label": "Flat Advisory Fee",
+      "description": "One-time fee per hedging plan",
+      "typical_range": { "low": 500, "high": 2000 }
+    },
+    "aum_percentage": {
+      "label": "AUM-Based Fee",
+      "description": "Annual percentage of hedge position value",
+      "typical_range": { "low": 1.0, "high": 2.0 },
+      "unit": "percent"
+    },
+    "subscription": {
+      "label": "Monthly Subscription",
+      "description": "Ongoing monthly fee for monitoring and rebalancing",
+      "typical_range": { "low": 200, "high": 500 },
+      "unit": "dollars_per_month"
+    }
+  }
+}
