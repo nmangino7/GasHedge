@@ -110,9 +110,20 @@ Please provide:
       disclaimers: DISCLAIMERS,
     });
   } catch (e) {
-    console.error("[AI Recommend] Error:", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[AI Recommend] Error:", errMsg);
+    let userMessage = `Error generating AI analysis: ${errMsg}`;
+    if (errMsg.includes("401") || errMsg.includes("authentication")) {
+      userMessage = "Anthropic API key is invalid or expired. Check ANTHROPIC_API_KEY in Vercel environment variables.";
+    } else if (errMsg.includes("429") || errMsg.includes("rate")) {
+      userMessage = "Anthropic API rate limit reached. Please try again in a moment.";
+    } else if (errMsg.includes("model") || errMsg.includes("not_found")) {
+      userMessage = `AI model error: ${errMsg}. The configured model may not be available for your API key.`;
+    } else if (errMsg.includes("timeout") || errMsg.includes("abort") || errMsg.includes("ECONNREFUSED")) {
+      userMessage = "AI request timed out. The Anthropic API may be temporarily unavailable.";
+    }
     return Response.json({
-      response: `Error: ${e instanceof Error ? e.message : String(e)}`,
+      response: userMessage,
       disclaimers: DISCLAIMERS,
     });
   }

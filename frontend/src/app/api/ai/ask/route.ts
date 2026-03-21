@@ -84,9 +84,20 @@ export async function POST(req: Request) {
       disclaimers: DISCLAIMERS,
     });
   } catch (e) {
-    console.error("[AI Ask] Error:", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[AI Ask] Error:", errMsg);
+    let userMessage = `Error: ${errMsg}`;
+    if (errMsg.includes("401") || errMsg.includes("authentication")) {
+      userMessage = "Anthropic API key is invalid or expired. Check ANTHROPIC_API_KEY in Vercel environment variables.";
+    } else if (errMsg.includes("429") || errMsg.includes("rate")) {
+      userMessage = "Rate limit reached. Please try again in a moment.";
+    } else if (errMsg.includes("model") || errMsg.includes("not_found")) {
+      userMessage = `AI model error: ${errMsg}`;
+    } else if (errMsg.includes("timeout") || errMsg.includes("abort")) {
+      userMessage = "Request timed out. Please try again.";
+    }
     return Response.json({
-      response: `Error: ${e instanceof Error ? e.message : String(e)}`,
+      response: userMessage,
       disclaimers: DISCLAIMERS,
     });
   }

@@ -56,8 +56,8 @@ export default function HedgingPage() {
     try {
       const data = await aiApi.recommend(companyId);
       setAiRec(data);
-    } catch {
-      setAiRec({ response: "Unable to generate AI recommendation. Check your ANTHROPIC_API_KEY.", disclaimers: [] });
+    } catch (err) {
+      setAiRec({ response: `AI recommendation error: ${err instanceof Error ? err.message : String(err)}`, disclaimers: [] });
     } finally {
       setAiLoading(false);
     }
@@ -69,8 +69,8 @@ export default function HedgingPage() {
     try {
       const data = await aiApi.ask(chatQuestion, companyId);
       setChatResponse(data.response);
-    } catch {
-      setChatResponse("Unable to get answer. Check your ANTHROPIC_API_KEY.");
+    } catch (err) {
+      setChatResponse(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setChatLoading(false);
     }

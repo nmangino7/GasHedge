@@ -35,17 +35,25 @@ export default function ReportsPage() {
     try {
       const [scenarioData, aiData] = await Promise.all([
         hedgingApi.scenarios(companyId, hedgeRatio, ticker),
-        aiApi.recommend(companyId).catch(() => ({
-          response: "AI analysis unavailable. Set ANTHROPIC_API_KEY in Vercel environment variables.",
+        aiApi.recommend(companyId).catch((err) => ({
+          response: `AI analysis error: ${err instanceof Error ? err.message : String(err)}`,
           disclaimers: [],
         })),
       ]);
       setScenarios(scenarioData.scenarios);
-      setAiNarrative(aiData);
+      // Check if AI returned an error message from the server
+      if (aiData.response && (aiData.response.startsWith("Error:") || aiData.response.startsWith("Claude API key not configured"))) {
+        setAiNarrative({
+          response: aiData.response,
+          disclaimers: aiData.disclaimers || [],
+        });
+      } else {
+        setAiNarrative(aiData);
+      }
       setGenerated(true);
-    } catch {
+    } catch (err) {
       setAiNarrative({
-        response: "Unable to generate report data. Verify API keys are configured.",
+        response: `Unable to generate report: ${err instanceof Error ? err.message : String(err)}`,
         disclaimers: [],
       });
       setGenerated(true);

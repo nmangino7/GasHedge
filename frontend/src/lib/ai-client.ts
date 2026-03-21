@@ -16,4 +16,5 @@ export function createAnthropicClient(): Anthropic | null {
   return new Anthropic({ apiKey });
 }
 
-export const AI_MODEL = "claude-sonnet-4-6";
+// Use claude-sonnet-4-20250514 as the stable model ID
+export const AI_MODEL = "claude-sonnet-4-20250514";
