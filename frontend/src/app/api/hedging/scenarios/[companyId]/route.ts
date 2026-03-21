@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { companyStore } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
 import { calculateHedgePosition, scenarioAnalysis } from "@/lib/hedging-engine";

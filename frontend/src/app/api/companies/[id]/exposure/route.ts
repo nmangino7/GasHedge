@@ -2,6 +2,8 @@ import { companyStore } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
 import { calculateExposure } from "@/lib/hedging-engine";
 
+export const maxDuration = 30;
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }

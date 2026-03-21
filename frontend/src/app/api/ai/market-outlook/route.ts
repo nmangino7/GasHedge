@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { DISCLAIMERS } from "@/lib/store";
 import {
   getCurrentPrice,

@@ -4,15 +4,22 @@ import Link from "next/link";
 import { companiesApi } from "@/lib/api";
 import type { Company } from "@/lib/types";
 import { COMPANY_TYPES, PADD_LABELS } from "@/lib/constants";
-import { Plus, Building2, ChevronRight } from "lucide-react";
+import { Plus, Building2, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("");
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    companiesApi.list(filter || undefined).then(setCompanies).catch(() => {}).finally(() => setLoading(false));
+    setLoading(true);
+    setError(null);
+    companiesApi.list(filter || undefined)
+      .then(setCompanies)
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false));
   }, [filter]);
 
   const typeLabel = (type: string) => COMPANY_TYPES.find((t) => t.value === type)?.label || type;
@@ -46,14 +53,17 @@ export default function CompaniesPage() {
         ))}
       </div>
 
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
       {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-4 animate-pulse">
-              <div className="h-4 bg-gray-100 rounded w-48 mb-2"></div>
-              <div className="h-3 bg-gray-100 rounded w-32"></div>
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 text-gray-400 animate-spin mb-3" />
+          <p className="text-sm text-gray-500">Loading companies...</p>
         </div>
       ) : companies.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-lg border border-gray-200">

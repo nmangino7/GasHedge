@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { getPriceHistory, calculateVolatility } from "@/lib/eia-service";
 
 export async function GET(

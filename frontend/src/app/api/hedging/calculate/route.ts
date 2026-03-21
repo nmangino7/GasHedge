@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { getCurrentPrice } from "@/lib/eia-service";
 import { calculateHedgePosition } from "@/lib/hedging-engine";
 import { getETFPrice } from "@/lib/alpha-vantage";

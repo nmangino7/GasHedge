@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { companyStore, DISCLAIMERS } from "@/lib/store";
 import { getCurrentPrice } from "@/lib/eia-service";
 import Anthropic from "@anthropic-ai/sdk";

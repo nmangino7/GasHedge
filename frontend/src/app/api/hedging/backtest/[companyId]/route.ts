@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { companyStore } from "@/lib/store";
 import { getPriceHistory } from "@/lib/eia-service";
 import { historicalBacktest, CORRELATION, DEFAULT_ETF_PRICES } from "@/lib/hedging-engine";

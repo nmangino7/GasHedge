@@ -5,7 +5,7 @@ import Link from "next/link";
 import { companiesApi, aiApi } from "@/lib/api";
 import type { Company, ExposureData, BenchmarkData } from "@/lib/types";
 import { COMPANY_TYPES, PADD_LABELS } from "@/lib/constants";
-import { Shield, FileText, MessageSquare, Loader2 } from "lucide-react";
+import { Shield, FileText, MessageSquare, Loader2, AlertTriangle } from "lucide-react";
 
 export default function CompanyDetailPage() {
   const params = useParams();
@@ -14,22 +14,33 @@ export default function CompanyDetailPage() {
   const [exposure, setExposure] = useState<ExposureData | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     if (!companyId) return;
-    Promise.all([
-      companiesApi.get(companyId),
-      companiesApi.getExposure(companyId).catch(() => null),
-      companiesApi.getBenchmark(companyId).catch(() => null),
-    ]).then(([c, e, b]) => {
-      setCompany(c);
-      setExposure(e);
-      setBenchmark(b);
-    }).finally(() => setLoading(false));
+    loadCompany();
   }, [companyId]);
+
+  async function loadCompany() {
+    setLoading(true);
+    setError(null);
+    try {
+      const c = await companiesApi.get(companyId);
+      setCompany(c);
+    } catch (err) {
+      setError(`Failed to load company: ${err instanceof Error ? err.message : String(err)}`);
+      setLoading(false);
+      return;
+    }
+
+    // Load exposure and benchmark in background — don't block page
+    setLoading(false);
+    companiesApi.getExposure(companyId).then(setExposure).catch(() => {});
+    companiesApi.getBenchmark(companyId).then(setBenchmark).catch(() => {});
+  }
 
   async function askAI() {
     if (!aiQuestion.trim()) return;
@@ -44,7 +55,29 @@ export default function CompanyDetailPage() {
     }
   }
 
-  if (loading) return <div className="animate-pulse"><div className="h-6 bg-gray-100 rounded w-48 mb-4"></div></div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 text-gray-400 animate-spin mb-4" />
+        <p className="text-sm font-medium text-gray-700">Loading company...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Error</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!company) return <p className="text-sm text-gray-500">Company not found.</p>;
 
   const typeLabel = COMPANY_TYPES.find((t) => t.value === company.company_type)?.label || company.company_type;
@@ -110,7 +143,9 @@ export default function CompanyDetailPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Unable to calculate exposure. Verify EIA API key is set.</p>
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading exposure data...
+            </div>
           )}
         </div>
 
@@ -145,7 +180,9 @@ export default function CompanyDetailPage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No benchmark data for this company type.</p>
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading benchmark...
+            </div>
           )}
         </div>
       </div>

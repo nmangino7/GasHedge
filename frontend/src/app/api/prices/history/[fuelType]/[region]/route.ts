@@ -1,3 +1,4 @@
+export const maxDuration = 30;
 import { getPriceHistory, REGION_LABELS } from "@/lib/eia-service";
 
 export async function GET(
