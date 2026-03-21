@@ -79,7 +79,7 @@ export default function DealsPage() {
       </div>
 
       {revenue && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {[
             { label: "Annual Revenue", value: `$${revenue.total_annual_revenue.toLocaleString()}`, icon: DollarSign },
             { label: "Monthly Revenue", value: `$${revenue.total_monthly_revenue.toLocaleString()}`, icon: DollarSign },
@@ -97,7 +97,7 @@ export default function DealsPage() {
       {revenue && Object.keys(revenue.revenue_by_type).length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Revenue by Fee Type</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {Object.entries(revenue.revenue_by_type).map(([type, amount]) => (
               <div key={type} className="text-center p-3 bg-gray-50 rounded-md">
                 <p className="text-xs text-gray-500 capitalize">{type.replace("_", " ")}</p>
@@ -111,7 +111,7 @@ export default function DealsPage() {
       {revenue && revenue.top_clients.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Top Clients</h2>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-5 px-5"><table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200">
               <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">Company</th>
               <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium">Annual Revenue</th>
@@ -126,7 +126,7 @@ export default function DealsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -135,7 +135,7 @@ export default function DealsPage() {
         {deals.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No deals yet. Create one to start tracking revenue.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-5 px-5"><table className="w-full text-sm min-w-[600px]">
             <thead><tr className="border-b border-gray-200">
               <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">Company</th>
               <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">Fee Type</th>
@@ -170,7 +170,7 @@ export default function DealsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

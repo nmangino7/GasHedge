@@ -132,7 +132,7 @@ export default function NewCompanyPage() {
                 {COMPANY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Contact Name</label>
                 <input type="text" value={form.contact_name} onChange={(e) => updateForm({ contact_name: e.target.value })}
@@ -262,7 +262,7 @@ export default function NewCompanyPage() {
         {step === 5 && (
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-gray-900 mb-3">Review & Confirm</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <div className="text-gray-500">Company</div><div className="text-gray-900 font-medium">{form.name}</div>
               <div className="text-gray-500">Type</div><div className="text-gray-900">{COMPANY_TYPES.find(t => t.value === form.company_type)?.label}</div>
               <div className="text-gray-500">Contact</div><div className="text-gray-900">{form.contact_name} ({form.contact_email})</div>

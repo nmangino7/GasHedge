@@ -105,9 +105,9 @@ export default function CompanyDetailPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{company.name}</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{company.name}</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-sm text-gray-500">{typeLabel}</span>
             <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${

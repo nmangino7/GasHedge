@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "GasHedge — Fuel Cost Management",
@@ -14,11 +14,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className="min-h-full flex bg-white">
-        <Sidebar />
-        <main className="flex-1 overflow-auto bg-gray-50/50">
-          <div className="max-w-6xl mx-auto px-8 py-8">{children}</div>
-        </main>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      </head>
+      <body className="min-h-full flex flex-col md:flex-row bg-white">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
