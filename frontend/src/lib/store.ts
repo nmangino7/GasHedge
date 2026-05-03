@@ -1,42 +1,22 @@
-// In-memory store for companies and deals.
-// Data persists within a single serverless instance but resets on cold starts.
-// For production persistence, integrate a hosted database (e.g. Vercel Postgres).
+import { ensureSchema, isDbConfigured, sql } from "./db";
+import { SEED_COMPANIES, SEED_DEALS } from "./seed";
+import type {
+  CompanyRecord,
+  DealRecord,
+  HedgingPlanRecord,
+  CompanyCreateInput,
+  DealCreateInput,
+  HedgingPlanCreateInput,
+} from "./store-types";
 
-export interface CompanyRecord {
-  id: number;
-  name: string;
-  company_type: string;
-  contact_name: string;
-  contact_email: string;
-  contact_phone: string | null;
-  address_state: string;
-  padd_region: string;
-  fleet_size: number;
-  vehicle_types: string;
-  fuel_type: string;
-  monthly_gallons_gasoline: number | null;
-  monthly_gallons_diesel: number | null;
-  annual_revenue: number | null;
-  notes: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DealRecord {
-  id: number;
-  company_id: number;
-  hedging_plan_id: number | null;
-  fee_structure: string;
-  fee_amount: number;
-  aum_value: number | null;
-  annual_fee_revenue: number;
-  status: string;
-  signed_date: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type {
+  CompanyRecord,
+  DealRecord,
+  HedgingPlanRecord,
+  CompanyCreateInput,
+  DealCreateInput,
+  HedgingPlanCreateInput,
+};
 
 const STATE_TO_PADD: Record<string, string> = {
   CT: "R10", ME: "R10", MA: "R10", NH: "R10", RI: "R10", VT: "R10",
@@ -54,152 +34,183 @@ export function getPadd(state: string): string {
   return STATE_TO_PADD[state.toUpperCase()] || "NUS";
 }
 
-// Seed data: 3 realistic company examples
-const SEED_COMPANIES: CompanyRecord[] = [
-  {
-    id: 1,
-    name: "Martinez Landscaping & Tree Service",
-    company_type: "landscaping",
-    contact_name: "Carlos Martinez",
-    contact_email: "carlos@martinezlandscaping.com",
-    contact_phone: "512-555-0147",
-    address_state: "TX",
-    padd_region: "R30",
-    fleet_size: 8,
-    vehicle_types: '["pickup_truck","mower_trailer"]',
-    fuel_type: "gasoline",
-    monthly_gallons_gasoline: 1800,
-    monthly_gallons_diesel: 0,
-    annual_revenue: 850000,
-    notes: "Family-owned since 2008. 8 crews running daily across Austin metro. Fuel costs spiked 35% last year and ate into margins. Looking for ways to stabilize fuel budget for next fiscal year. Currently has no fuel management strategy.",
-    status: "active",
-    created_at: "2025-11-15T10:00:00Z",
-    updated_at: "2026-01-20T14:30:00Z",
-  },
-  {
-    id: 2,
-    name: "Great Plains Freight LLC",
-    company_type: "trucking_local",
-    contact_name: "Sarah Johnson",
-    contact_email: "sjohnson@gpfreight.com",
-    contact_phone: "316-555-0289",
-    address_state: "KS",
-    padd_region: "R20",
-    fleet_size: 12,
-    vehicle_types: '["semi","flatbed","box_truck"]',
-    fuel_type: "diesel",
-    monthly_gallons_gasoline: 0,
-    monthly_gallons_diesel: 24000,
-    annual_revenue: 3200000,
-    notes: "Regional freight carrier covering KS, MO, OK, NE. Diesel is 32% of revenue. Lost a major bid last quarter because fuel cost estimates were too uncertain. Needs predictable fuel costs to bid competitively on contracts.",
-    status: "active",
-    created_at: "2025-10-01T08:00:00Z",
-    updated_at: "2026-02-10T09:15:00Z",
-  },
-  {
-    id: 3,
-    name: "Bay Area Express Delivery",
-    company_type: "delivery",
-    contact_name: "Mike Chen",
-    contact_email: "mike@bayareaexpress.com",
-    contact_phone: "415-555-0193",
-    address_state: "CA",
-    padd_region: "R50",
-    fleet_size: 25,
-    vehicle_types: '["van","pickup_truck"]',
-    fuel_type: "gasoline",
-    monthly_gallons_gasoline: 8750,
-    monthly_gallons_diesel: 0,
-    annual_revenue: 4500000,
-    notes: "Last-mile delivery service in SF Bay Area. West Coast gas prices are consistently the highest in the country. 25 vans averaging 350 gal/month each. Exploring hedging to protect margins as they scale to 40 vehicles by Q4.",
-    status: "active",
-    created_at: "2025-12-05T11:00:00Z",
-    updated_at: "2026-03-01T16:45:00Z",
-  },
-];
+const memCompanies: CompanyRecord[] = SEED_COMPANIES.map((c) => ({ ...c }));
+const memDeals: DealRecord[] = SEED_DEALS.map((d) => ({ ...d }));
+const memPlans: HedgingPlanRecord[] = [];
+let nextCompanyId = Math.max(...memCompanies.map((c) => c.id), 0) + 1;
+let nextDealId = Math.max(...memDeals.map((d) => d.id), 0) + 1;
+let nextPlanId = 1;
 
-const SEED_DEALS: DealRecord[] = [
-  {
-    id: 1,
-    company_id: 2,
-    hedging_plan_id: null,
-    fee_structure: "aum_percentage",
-    fee_amount: 1.5,
-    aum_value: 120000,
-    annual_fee_revenue: 1800,
-    status: "active",
-    signed_date: "2026-01-15",
-    notes: "50% hedge on diesel via USO",
-    created_at: "2026-01-10T10:00:00Z",
-    updated_at: "2026-01-15T14:00:00Z",
-  },
-  {
-    id: 2,
-    company_id: 1,
-    hedging_plan_id: null,
-    fee_structure: "flat",
-    fee_amount: 1000,
-    aum_value: null,
-    annual_fee_revenue: 1000,
-    status: "signed",
-    signed_date: "2026-02-20",
-    notes: "Conservative 25% hedge plan",
-    created_at: "2026-02-15T09:00:00Z",
-    updated_at: "2026-02-20T11:00:00Z",
-  },
-  {
-    id: 3,
-    company_id: 3,
-    hedging_plan_id: null,
-    fee_structure: "subscription",
-    fee_amount: 350,
-    aum_value: null,
-    annual_fee_revenue: 4200,
-    status: "proposed",
-    signed_date: null,
-    notes: "Monthly monitoring + quarterly rebalancing",
-    created_at: "2026-03-10T13:00:00Z",
-    updated_at: "2026-03-10T13:00:00Z",
-  },
-];
+type DbCompanyRow = {
+  id: number;
+  name: string;
+  company_type: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string | null;
+  address_state: string;
+  padd_region: string;
+  fleet_size: number;
+  vehicle_types: string;
+  fuel_type: string;
+  monthly_gallons_gasoline: string | number | null;
+  monthly_gallons_diesel: string | number | null;
+  annual_revenue: string | number | null;
+  notes: string | null;
+  status: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
 
-// Singleton stores
-let companies: CompanyRecord[] = [...SEED_COMPANIES];
-let deals: DealRecord[] = [...SEED_DEALS];
-let nextCompanyId = 4;
-let nextDealId = 4;
+type DbDealRow = {
+  id: number;
+  company_id: number;
+  hedging_plan_id: number | null;
+  fee_structure: string;
+  fee_amount: string | number;
+  aum_value: string | number | null;
+  annual_fee_revenue: string | number;
+  status: string;
+  signed_date: Date | string | null;
+  notes: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+type DbPlanRow = {
+  id: number;
+  company_id: number;
+  deal_id: number | null;
+  approach: string;
+  tier: string;
+  hedge_ratio: string | number;
+  product_ticker: string;
+  brokerage: string;
+  brokerage_other: string | null;
+  start_timing: string;
+  custom_date: Date | string | null;
+  rebalance_frequency: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+const num = (v: string | number | null | undefined): number | null =>
+  v === null || v === undefined ? null : typeof v === "number" ? v : Number(v);
+
+const numReq = (v: string | number): number =>
+  typeof v === "number" ? v : Number(v);
+
+const iso = (v: Date | string): string =>
+  typeof v === "string" ? v : v.toISOString();
+
+const isoNullable = (v: Date | string | null): string | null =>
+  v === null ? null : typeof v === "string" ? v : v.toISOString().slice(0, 10);
+
+const mapCompany = (r: DbCompanyRow): CompanyRecord => ({
+  id: r.id,
+  name: r.name,
+  company_type: r.company_type,
+  contact_name: r.contact_name,
+  contact_email: r.contact_email,
+  contact_phone: r.contact_phone,
+  address_state: r.address_state,
+  padd_region: r.padd_region,
+  fleet_size: r.fleet_size,
+  vehicle_types: r.vehicle_types,
+  fuel_type: r.fuel_type,
+  monthly_gallons_gasoline: num(r.monthly_gallons_gasoline),
+  monthly_gallons_diesel: num(r.monthly_gallons_diesel),
+  annual_revenue: num(r.annual_revenue),
+  notes: r.notes,
+  status: r.status,
+  created_at: iso(r.created_at),
+  updated_at: iso(r.updated_at),
+});
+
+const mapDeal = (r: DbDealRow): DealRecord => ({
+  id: r.id,
+  company_id: r.company_id,
+  hedging_plan_id: r.hedging_plan_id,
+  fee_structure: r.fee_structure,
+  fee_amount: numReq(r.fee_amount),
+  aum_value: num(r.aum_value),
+  annual_fee_revenue: numReq(r.annual_fee_revenue),
+  status: r.status,
+  signed_date: isoNullable(r.signed_date),
+  notes: r.notes,
+  created_at: iso(r.created_at),
+  updated_at: iso(r.updated_at),
+});
+
+const mapPlan = (r: DbPlanRow): HedgingPlanRecord => ({
+  id: r.id,
+  company_id: r.company_id,
+  deal_id: r.deal_id,
+  approach: r.approach,
+  tier: r.tier,
+  hedge_ratio: numReq(r.hedge_ratio),
+  product_ticker: r.product_ticker,
+  brokerage: r.brokerage,
+  brokerage_other: r.brokerage_other,
+  start_timing: r.start_timing,
+  custom_date: isoNullable(r.custom_date),
+  rebalance_frequency: r.rebalance_frequency,
+  created_at: iso(r.created_at),
+  updated_at: iso(r.updated_at),
+});
+
+// ---------- Companies ----------
 
 export const companyStore = {
-  list(status?: string, companyType?: string): CompanyRecord[] {
-    let result = [...companies];
+  async list(status?: string, companyType?: string): Promise<CompanyRecord[]> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = status && companyType
+        ? await sql<DbCompanyRow>`SELECT * FROM companies WHERE status = ${status} AND company_type = ${companyType} ORDER BY created_at DESC`
+        : status
+        ? await sql<DbCompanyRow>`SELECT * FROM companies WHERE status = ${status} ORDER BY created_at DESC`
+        : companyType
+        ? await sql<DbCompanyRow>`SELECT * FROM companies WHERE company_type = ${companyType} ORDER BY created_at DESC`
+        : await sql<DbCompanyRow>`SELECT * FROM companies ORDER BY created_at DESC`;
+      return rows.map(mapCompany);
+    }
+    let result = [...memCompanies];
     if (status) result = result.filter((c) => c.status === status);
-    if (companyType)
-      result = result.filter((c) => c.company_type === companyType);
+    if (companyType) result = result.filter((c) => c.company_type === companyType);
     return result.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   },
 
-  get(id: number): CompanyRecord | undefined {
-    return companies.find((c) => c.id === id);
+  async get(id: number): Promise<CompanyRecord | undefined> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbCompanyRow>`SELECT * FROM companies WHERE id = ${id}`;
+      return rows[0] ? mapCompany(rows[0]) : undefined;
+    }
+    return memCompanies.find((c) => c.id === id);
   },
 
-  create(data: {
-    name: string;
-    company_type: string;
-    contact_name: string;
-    contact_email: string;
-    contact_phone?: string | null;
-    address_state: string;
-    fleet_size: number;
-    vehicle_types?: string;
-    fuel_type: string;
-    monthly_gallons_gasoline?: number | null;
-    monthly_gallons_diesel?: number | null;
-    annual_revenue?: number | null;
-    notes?: string | null;
-  }): CompanyRecord {
+  async create(data: CompanyCreateInput): Promise<CompanyRecord> {
+    const padd = getPadd(data.address_state);
+    const state = data.address_state.toUpperCase();
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbCompanyRow>`
+        INSERT INTO companies (
+          name, company_type, contact_name, contact_email, contact_phone,
+          address_state, padd_region, fleet_size, vehicle_types, fuel_type,
+          monthly_gallons_gasoline, monthly_gallons_diesel, annual_revenue, notes, status
+        ) VALUES (
+          ${data.name}, ${data.company_type}, ${data.contact_name}, ${data.contact_email},
+          ${data.contact_phone ?? null}, ${state}, ${padd}, ${data.fleet_size},
+          ${data.vehicle_types ?? "[]"}, ${data.fuel_type},
+          ${data.monthly_gallons_gasoline ?? null}, ${data.monthly_gallons_diesel ?? null},
+          ${data.annual_revenue ?? null}, ${data.notes ?? null}, 'active'
+        ) RETURNING *
+      `;
+      return mapCompany(rows[0]);
+    }
     const now = new Date().toISOString();
     const company: CompanyRecord = {
       id: nextCompanyId++,
@@ -207,11 +218,11 @@ export const companyStore = {
       company_type: data.company_type,
       contact_name: data.contact_name,
       contact_email: data.contact_email,
-      contact_phone: data.contact_phone || null,
-      address_state: data.address_state.toUpperCase(),
-      padd_region: getPadd(data.address_state),
+      contact_phone: data.contact_phone ?? null,
+      address_state: state,
+      padd_region: padd,
       fleet_size: data.fleet_size,
-      vehicle_types: data.vehicle_types || "[]",
+      vehicle_types: data.vehicle_types ?? "[]",
       fuel_type: data.fuel_type,
       monthly_gallons_gasoline: data.monthly_gallons_gasoline ?? null,
       monthly_gallons_diesel: data.monthly_gallons_diesel ?? null,
@@ -221,60 +232,115 @@ export const companyStore = {
       created_at: now,
       updated_at: now,
     };
-    companies.push(company);
+    memCompanies.push(company);
     return company;
   },
 
-  update(
+  async update(
     id: number,
     data: Partial<Omit<CompanyRecord, "id" | "created_at">>
-  ): CompanyRecord | null {
-    const idx = companies.findIndex((c) => c.id === id);
+  ): Promise<CompanyRecord | null> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const existing = await companyStore.get(id);
+      if (!existing) return null;
+      const merged = { ...existing, ...data };
+      if (data.address_state) merged.padd_region = getPadd(data.address_state);
+      const { rows } = await sql<DbCompanyRow>`
+        UPDATE companies SET
+          name = ${merged.name},
+          company_type = ${merged.company_type},
+          contact_name = ${merged.contact_name},
+          contact_email = ${merged.contact_email},
+          contact_phone = ${merged.contact_phone},
+          address_state = ${merged.address_state},
+          padd_region = ${merged.padd_region},
+          fleet_size = ${merged.fleet_size},
+          vehicle_types = ${merged.vehicle_types},
+          fuel_type = ${merged.fuel_type},
+          monthly_gallons_gasoline = ${merged.monthly_gallons_gasoline},
+          monthly_gallons_diesel = ${merged.monthly_gallons_diesel},
+          annual_revenue = ${merged.annual_revenue},
+          notes = ${merged.notes},
+          status = ${merged.status},
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      return rows[0] ? mapCompany(rows[0]) : null;
+    }
+    const idx = memCompanies.findIndex((c) => c.id === id);
     if (idx === -1) return null;
-    const updated = {
-      ...companies[idx],
+    const updated: CompanyRecord = {
+      ...memCompanies[idx],
       ...data,
       updated_at: new Date().toISOString(),
     };
-    if (data.address_state) {
-      updated.padd_region = getPadd(data.address_state);
-    }
-    companies[idx] = updated;
+    if (data.address_state) updated.padd_region = getPadd(data.address_state);
+    memCompanies[idx] = updated;
     return updated;
   },
 
-  delete(id: number): boolean {
-    const idx = companies.findIndex((c) => c.id === id);
+  async delete(id: number): Promise<boolean> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rowCount } = await sql`UPDATE companies SET status = 'archived', updated_at = NOW() WHERE id = ${id}`;
+      return (rowCount ?? 0) > 0;
+    }
+    const idx = memCompanies.findIndex((c) => c.id === id);
     if (idx === -1) return false;
-    companies[idx].status = "archived";
+    memCompanies[idx].status = "archived";
     return true;
   },
 };
 
+// ---------- Deals ----------
+
 export const dealStore = {
-  list(status?: string, companyId?: number): DealRecord[] {
-    let result = [...deals];
+  async list(status?: string, companyId?: number): Promise<DealRecord[]> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = status && companyId
+        ? await sql<DbDealRow>`SELECT * FROM deals WHERE status = ${status} AND company_id = ${companyId} ORDER BY created_at DESC`
+        : status
+        ? await sql<DbDealRow>`SELECT * FROM deals WHERE status = ${status} ORDER BY created_at DESC`
+        : companyId
+        ? await sql<DbDealRow>`SELECT * FROM deals WHERE company_id = ${companyId} ORDER BY created_at DESC`
+        : await sql<DbDealRow>`SELECT * FROM deals ORDER BY created_at DESC`;
+      return rows.map(mapDeal);
+    }
+    let result = [...memDeals];
     if (status) result = result.filter((d) => d.status === status);
     if (companyId) result = result.filter((d) => d.company_id === companyId);
     return result.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   },
 
-  get(id: number): DealRecord | undefined {
-    return deals.find((d) => d.id === id);
+  async get(id: number): Promise<DealRecord | undefined> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbDealRow>`SELECT * FROM deals WHERE id = ${id}`;
+      return rows[0] ? mapDeal(rows[0]) : undefined;
+    }
+    return memDeals.find((d) => d.id === id);
   },
 
-  create(data: {
-    company_id: number;
-    hedging_plan_id?: number | null;
-    fee_structure: string;
-    fee_amount: number;
-    aum_value?: number | null;
-    annual_fee_revenue: number;
-    notes?: string | null;
-  }): DealRecord {
+  async create(data: DealCreateInput): Promise<DealRecord> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbDealRow>`
+        INSERT INTO deals (
+          company_id, hedging_plan_id, fee_structure, fee_amount, aum_value,
+          annual_fee_revenue, status, notes
+        ) VALUES (
+          ${data.company_id}, ${data.hedging_plan_id ?? null}, ${data.fee_structure},
+          ${data.fee_amount}, ${data.aum_value ?? null}, ${data.annual_fee_revenue},
+          'prospect', ${data.notes ?? null}
+        ) RETURNING *
+      `;
+      return mapDeal(rows[0]);
+    }
     const now = new Date().toISOString();
     const deal: DealRecord = {
       id: nextDealId++,
@@ -290,22 +356,134 @@ export const dealStore = {
       created_at: now,
       updated_at: now,
     };
-    deals.push(deal);
+    memDeals.push(deal);
     return deal;
   },
 
-  update(
+  async update(
     id: number,
     data: Partial<Omit<DealRecord, "id" | "created_at">>
-  ): DealRecord | null {
-    const idx = deals.findIndex((d) => d.id === id);
+  ): Promise<DealRecord | null> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const existing = await dealStore.get(id);
+      if (!existing) return null;
+      const merged = { ...existing, ...data };
+      const signedDate = merged.signed_date;
+      const { rows } = await sql<DbDealRow>`
+        UPDATE deals SET
+          company_id = ${merged.company_id},
+          hedging_plan_id = ${merged.hedging_plan_id},
+          fee_structure = ${merged.fee_structure},
+          fee_amount = ${merged.fee_amount},
+          aum_value = ${merged.aum_value},
+          annual_fee_revenue = ${merged.annual_fee_revenue},
+          status = ${merged.status},
+          signed_date = ${signedDate},
+          notes = ${merged.notes},
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      return rows[0] ? mapDeal(rows[0]) : null;
+    }
+    const idx = memDeals.findIndex((d) => d.id === id);
     if (idx === -1) return null;
-    deals[idx] = {
-      ...deals[idx],
+    memDeals[idx] = {
+      ...memDeals[idx],
       ...data,
       updated_at: new Date().toISOString(),
     };
-    return deals[idx];
+    return memDeals[idx];
+  },
+
+  async delete(id: number): Promise<boolean> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rowCount } = await sql`DELETE FROM deals WHERE id = ${id}`;
+      return (rowCount ?? 0) > 0;
+    }
+    const idx = memDeals.findIndex((d) => d.id === id);
+    if (idx === -1) return false;
+    memDeals.splice(idx, 1);
+    return true;
+  },
+};
+
+// ---------- Hedging Plans ----------
+
+export const hedgingPlanStore = {
+  async list(companyId?: number): Promise<HedgingPlanRecord[]> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = companyId
+        ? await sql<DbPlanRow>`SELECT * FROM hedging_plans WHERE company_id = ${companyId} ORDER BY created_at DESC`
+        : await sql<DbPlanRow>`SELECT * FROM hedging_plans ORDER BY created_at DESC`;
+      return rows.map(mapPlan);
+    }
+    let result = [...memPlans];
+    if (companyId) result = result.filter((p) => p.company_id === companyId);
+    return result.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  },
+
+  async get(id: number): Promise<HedgingPlanRecord | undefined> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbPlanRow>`SELECT * FROM hedging_plans WHERE id = ${id}`;
+      return rows[0] ? mapPlan(rows[0]) : undefined;
+    }
+    return memPlans.find((p) => p.id === id);
+  },
+
+  async create(data: HedgingPlanCreateInput): Promise<HedgingPlanRecord> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbPlanRow>`
+        INSERT INTO hedging_plans (
+          company_id, deal_id, approach, tier, hedge_ratio, product_ticker,
+          brokerage, brokerage_other, start_timing, custom_date, rebalance_frequency
+        ) VALUES (
+          ${data.company_id}, ${data.deal_id ?? null}, ${data.approach}, ${data.tier},
+          ${data.hedge_ratio}, ${data.product_ticker}, ${data.brokerage},
+          ${data.brokerage_other ?? null}, ${data.start_timing},
+          ${data.custom_date ?? null}, ${data.rebalance_frequency}
+        ) RETURNING *
+      `;
+      return mapPlan(rows[0]);
+    }
+    const now = new Date().toISOString();
+    const plan: HedgingPlanRecord = {
+      id: nextPlanId++,
+      company_id: data.company_id,
+      deal_id: data.deal_id ?? null,
+      approach: data.approach,
+      tier: data.tier,
+      hedge_ratio: data.hedge_ratio,
+      product_ticker: data.product_ticker,
+      brokerage: data.brokerage,
+      brokerage_other: data.brokerage_other ?? null,
+      start_timing: data.start_timing,
+      custom_date: data.custom_date ?? null,
+      rebalance_frequency: data.rebalance_frequency,
+      created_at: now,
+      updated_at: now,
+    };
+    memPlans.push(plan);
+    return plan;
+  },
+
+  async delete(id: number): Promise<boolean> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rowCount } = await sql`DELETE FROM hedging_plans WHERE id = ${id}`;
+      return (rowCount ?? 0) > 0;
+    }
+    const idx = memPlans.findIndex((p) => p.id === id);
+    if (idx === -1) return false;
+    memPlans.splice(idx, 1);
+    return true;
   },
 };
 

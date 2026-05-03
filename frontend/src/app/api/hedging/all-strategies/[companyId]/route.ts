@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { companyId } = await params;
-    const company = companyStore.get(Number(companyId));
+    const company = await companyStore.get(Number(companyId));
     if (!company) return Response.json({ error: "Company not found" }, { status: 404 });
 
     const url = new URL(req.url);

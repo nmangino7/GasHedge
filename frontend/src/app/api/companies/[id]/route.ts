@@ -5,7 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const company = companyStore.get(Number(id));
+  const company = await companyStore.get(Number(id));
   if (!company)
     return Response.json({ detail: "Company not found" }, { status: 404 });
   return Response.json(company);
@@ -17,7 +17,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   const data = await req.json();
-  const company = companyStore.update(Number(id), data);
+  const company = await companyStore.update(Number(id), data);
   if (!company)
     return Response.json({ detail: "Company not found" }, { status: 404 });
   return Response.json(company);
@@ -28,7 +28,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const deleted = companyStore.delete(Number(id));
+  const deleted = await companyStore.delete(Number(id));
   if (!deleted)
     return Response.json({ detail: "Company not found" }, { status: 404 });
   return Response.json({ status: "archived" });

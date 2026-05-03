@@ -105,15 +105,56 @@ export const hedgingApi = {
 
 // Deals
 export const dealsApi = {
-  list: (status?: string) =>
-    fetchJson<Deal[]>(`/deals${status ? `?status=${status}` : ""}`),
+  list: (filter?: { status?: string; companyId?: number }) => {
+    const params = new URLSearchParams();
+    if (filter?.status) params.set("status", filter.status);
+    if (filter?.companyId !== undefined) params.set("company_id", String(filter.companyId));
+    const qs = params.toString();
+    return fetchJson<Deal[]>(`/deals${qs ? `?${qs}` : ""}`);
+  },
   get: (id: number) => fetchJson<Deal>(`/deals/${id}`),
   create: (data: { company_id: number; fee_structure: string; fee_amount: number; aum_value?: number; notes?: string }) =>
     fetchJson<Deal>("/deals", { method: "POST", body: JSON.stringify(data) }),
   update: (id: number, data: Partial<Deal>) =>
     fetchJson<Deal>(`/deals/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    fetchJson<{ status: string }>(`/deals/${id}`, { method: "DELETE" }),
   revenue: () => fetchJson<RevenueData>("/deals/revenue"),
   pipeline: () => fetchJson<{ stages: Record<string, Deal[]> }>("/deals/pipeline"),
+};
+
+// Hedging plans (persisted)
+export interface HedgingPlan {
+  id: number;
+  company_id: number;
+  deal_id: number | null;
+  approach: string;
+  tier: string;
+  hedge_ratio: number;
+  product_ticker: string;
+  brokerage: string;
+  brokerage_other: string | null;
+  start_timing: string;
+  custom_date: string | null;
+  rebalance_frequency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const hedgingPlansApi = {
+  list: (companyId?: number) =>
+    fetchJson<HedgingPlan[]>(
+      `/hedging-plans${companyId !== undefined ? `?company_id=${companyId}` : ""}`
+    ),
+  get: (id: number) =>
+    fetchJson<HedgingPlan & { company_name: string }>(`/hedging-plans/${id}`),
+  create: (data: Omit<HedgingPlan, "id" | "created_at" | "updated_at">) =>
+    fetchJson<HedgingPlan>("/hedging-plans", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: number) =>
+    fetchJson<{ status: string }>(`/hedging-plans/${id}`, { method: "DELETE" }),
 };
 
 // AI

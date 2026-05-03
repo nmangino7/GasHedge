@@ -5,7 +5,7 @@ import Link from "next/link";
 import { companiesApi, aiApi } from "@/lib/api";
 import type { Company, ExposureData, BenchmarkData } from "@/lib/types";
 import { COMPANY_TYPES, PADD_LABELS } from "@/lib/constants";
-import { Shield, FileText, MessageSquare, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Shield, FileText, MessageSquare, Loader2, AlertTriangle, RefreshCw, Calculator, ClipboardList, DollarSign } from "lucide-react";
 
 export default function CompanyDetailPage() {
   const params = useParams();
@@ -115,16 +115,30 @@ export default function CompanyDetailPage() {
             }`}>{company.status}</span>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Link href={`/hedging/${company.id}`}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium">
-            <Shield className="h-3.5 w-3.5" /> Hedging Strategies
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-6">
+        {[
+          { href: `/hedging/${company.id}`, label: "Hedging", icon: Shield, primary: true },
+          { href: `/implementation/${company.id}`, label: "Implementation", icon: ClipboardList },
+          { href: `/risk-score/${company.id}`, label: "Risk Score", icon: AlertTriangle },
+          { href: `/budget/${company.id}`, label: "Budget", icon: Calculator },
+          { href: `/reports/${company.id}`, label: "Reports", icon: FileText },
+          { href: `/deals?prefill_company=${company.id}`, label: "Deals", icon: DollarSign },
+        ].map((action) => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              action.primary
+                ? "bg-gray-900 text-white hover:bg-gray-800"
+                : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            <action.icon className="h-3.5 w-3.5" /> {action.label}
           </Link>
-          <Link href={`/reports/${company.id}`}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium">
-            <FileText className="h-3.5 w-3.5" /> Report
-          </Link>
-        </div>
+        ))}
       </div>
 
       {/* Main content */}

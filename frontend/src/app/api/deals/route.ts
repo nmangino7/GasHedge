@@ -6,22 +6,30 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status") || undefined;
   const companyId = url.searchParams.get("company_id");
 
-  const deals = dealStore.list(
+  const deals = await dealStore.list(
     status,
     companyId ? Number(companyId) : undefined
   );
 
+  const companyIds = Array.from(new Set(deals.map((d) => d.company_id)));
+  const companies = await Promise.all(
+    companyIds.map((id) => companyStore.get(id))
+  );
+  const nameById = new Map(
+    companies.filter(Boolean).map((c) => [c!.id, c!.name])
+  );
+
   return Response.json(
-    deals.map((d) => {
-      const company = companyStore.get(d.company_id);
-      return { ...d, company_name: company?.name || "Unknown" };
-    })
+    deals.map((d) => ({
+      ...d,
+      company_name: nameById.get(d.company_id) || "Unknown",
+    }))
   );
 }
 
 export async function POST(req: Request) {
   const data = await req.json();
-  const company = companyStore.get(data.company_id);
+  const company = await companyStore.get(data.company_id);
   if (!company)
     return Response.json({ detail: "Company not found" }, { status: 404 });
 
@@ -31,7 +39,7 @@ export async function POST(req: Request) {
     data.aum_value
   );
 
-  const deal = dealStore.create({
+  const deal = await dealStore.create({
     ...data,
     annual_fee_revenue: annualRevenue,
   });

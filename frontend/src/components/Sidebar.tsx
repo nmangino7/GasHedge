@@ -10,11 +10,18 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-const toolItems = [
-  { href: "/risk-score/1", label: "Risk Score", icon: Shield },
-  { href: "/budget/1", label: "Budget Calculator", icon: Calculator },
-  { href: "/implementation/1", label: "Implementation", icon: FileText },
+const TOOL_DEFS = [
+  { slug: "risk-score", label: "Risk Score", icon: Shield },
+  { slug: "budget", label: "Budget Calculator", icon: Calculator },
+  { slug: "implementation", label: "Implementation", icon: FileText },
 ];
+
+function extractCompanyId(pathname: string): string | null {
+  const match = pathname.match(
+    /^\/(companies|risk-score|budget|implementation|hedging|reports)\/(\d+)/
+  );
+  return match ? match[2] : null;
+}
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -23,6 +30,11 @@ interface SidebarProps {
 
 export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const activeCompanyId = extractCompanyId(pathname);
+  const toolItems = TOOL_DEFS.map((t) => ({
+    ...t,
+    href: activeCompanyId ? `/${t.slug}/${activeCompanyId}` : null,
+  }));
 
   return (
     <>
@@ -78,20 +90,38 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           })}
 
           <div className="pt-4 pb-1">
-            <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Tools</p>
+            <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Tools{activeCompanyId ? "" : " (pick a company)"}
+            </p>
           </div>
           {toolItems.map((item) => {
-            const isActive = pathname.startsWith(item.href.split("/").slice(0, 2).join("/"));
+            const isActive = item.href ? pathname.startsWith(`/${item.slug}/`) : false;
+            const disabled = !item.href;
+            const className = `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+              disabled
+                ? "text-slate-300 cursor-not-allowed"
+                : isActive
+                ? "bg-indigo-50 text-indigo-700 font-semibold border-l-[3px] border-indigo-600 ml-0 pl-2.5"
+                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            }`;
+            if (disabled) {
+              return (
+                <div
+                  key={item.slug}
+                  className={className}
+                  title="Open a company first to use this tool"
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </div>
+              );
+            }
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={item.slug}
+                href={item.href!}
                 onClick={onClose}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                  isActive
-                    ? "bg-indigo-50 text-indigo-700 font-semibold border-l-[3px] border-indigo-600 ml-0 pl-2.5"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
+                className={className}
               >
                 <item.icon className={`h-4 w-4 ${isActive ? "text-indigo-600" : ""}`} />
                 {item.label}

@@ -2,7 +2,7 @@ import { dealStore, companyStore } from "@/lib/store";
 
 export async function GET() {
   const activeStatuses = ["signed", "active"];
-  const allDeals = dealStore.list();
+  const allDeals = await dealStore.list();
   const activeDeals = allDeals.filter((d) =>
     activeStatuses.includes(d.status)
   );
@@ -27,6 +27,14 @@ export async function GET() {
     0
   );
 
+  const companyIds = Array.from(new Set(activeDeals.map((d) => d.company_id)));
+  const companies = await Promise.all(
+    companyIds.map((id) => companyStore.get(id))
+  );
+  const nameById = new Map(
+    companies.filter(Boolean).map((c) => [c!.id, c!.name])
+  );
+
   const clientRevenue: Record<
     number,
     {
@@ -38,10 +46,9 @@ export async function GET() {
   > = {};
   for (const deal of activeDeals) {
     if (!clientRevenue[deal.company_id]) {
-      const company = companyStore.get(deal.company_id);
       clientRevenue[deal.company_id] = {
         company_id: deal.company_id,
-        company_name: company?.name || "Unknown",
+        company_name: nameById.get(deal.company_id) || "Unknown",
         annual_revenue: 0,
         deal_count: 0,
       };

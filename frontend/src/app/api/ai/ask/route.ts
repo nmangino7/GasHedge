@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
     let contextStr = "";
     if (data.company_id) {
-      const company = companyStore.get(data.company_id);
+      const company = await companyStore.get(data.company_id);
       if (company) {
         const gasPrice = await getCurrentPrice("gasoline", company.padd_region);
         const dieselPrice = await getCurrentPrice("diesel", company.padd_region);
