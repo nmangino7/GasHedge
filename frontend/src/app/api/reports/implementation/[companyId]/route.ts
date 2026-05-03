@@ -110,6 +110,23 @@ const FREQUENCY_LABELS: Record<string, string> = {
   semi_annually: "Semi-Annually",
 };
 
+function planFromParams(url: URL) {
+  return {
+    approach: url.searchParams.get("approach") || "etf",
+    tier: url.searchParams.get("tier") || "moderate",
+    hedge_ratio: parseFloat(url.searchParams.get("hedge_ratio") || "0.5"),
+    product_ticker: url.searchParams.get("product_ticker") || "UGA",
+    brokerage: url.searchParams.get("brokerage") || "charles_schwab",
+    brokerage_other: url.searchParams.get("brokerage_other") || null,
+    start_timing: url.searchParams.get("start_timing") || "immediately",
+    custom_date: url.searchParams.get("custom_date") || null,
+    rebalance_frequency: url.searchParams.get("rebalance_frequency") || "quarterly",
+    deal_id: url.searchParams.get("deal_id")
+      ? Number(url.searchParams.get("deal_id"))
+      : null,
+  };
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ companyId: string }> }
@@ -139,23 +156,13 @@ export async function GET(
     let plan: PlanShape;
     if (planId) {
       const stored = await hedgingPlanStore.get(Number(planId));
-      if (!stored) return new Response("Plan not found", { status: 404 });
-      plan = stored;
+      if (stored) {
+        plan = stored;
+      } else {
+        plan = planFromParams(url);
+      }
     } else {
-      plan = {
-        approach: url.searchParams.get("approach") || "etf",
-        tier: url.searchParams.get("tier") || "moderate",
-        hedge_ratio: parseFloat(url.searchParams.get("hedge_ratio") || "0.5"),
-        product_ticker: url.searchParams.get("product_ticker") || "UGA",
-        brokerage: url.searchParams.get("brokerage") || "charles_schwab",
-        brokerage_other: url.searchParams.get("brokerage_other"),
-        start_timing: url.searchParams.get("start_timing") || "immediately",
-        custom_date: url.searchParams.get("custom_date"),
-        rebalance_frequency: url.searchParams.get("rebalance_frequency") || "quarterly",
-        deal_id: url.searchParams.get("deal_id")
-          ? Number(url.searchParams.get("deal_id"))
-          : null,
-      };
+      plan = planFromParams(url);
     }
 
     const fuelType = company.fuel_type === "diesel" ? "diesel" : "gasoline";

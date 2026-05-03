@@ -367,8 +367,20 @@ function ImplementationPageInner() {
       });
       setPlanSaved({ id: created.id });
 
-      const url = `/api/reports/implementation/${companyId}?plan_id=${created.id}`;
-      window.open(url, "_blank");
+      const fallbackParams = new URLSearchParams({
+        plan_id: String(created.id),
+        approach,
+        tier,
+        hedge_ratio: String(hedgeRatio),
+        product_ticker: productTicker,
+        brokerage,
+        start_timing: startTiming,
+        rebalance_frequency: rebalanceFrequency,
+      });
+      if (brokerage === "other" && otherBrokerage) fallbackParams.set("brokerage_other", otherBrokerage);
+      if (startTiming === "custom" && customDate) fallbackParams.set("custom_date", customDate);
+      if (linkedDeal) fallbackParams.set("deal_id", String(linkedDeal.id));
+      window.open(`/api/reports/implementation/${companyId}?${fallbackParams}`, "_blank");
     } catch (e) {
       alert(`Failed to save plan: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -957,12 +969,22 @@ function ImplementationPageInner() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
-                onClick={() =>
-                  window.open(
-                    `/api/reports/implementation/${companyId}?plan_id=${planSaved.id}`,
-                    "_blank"
-                  )
-                }
+                onClick={() => {
+                  const p = new URLSearchParams({
+                    plan_id: String(planSaved.id),
+                    approach,
+                    tier,
+                    hedge_ratio: String(hedgeRatio),
+                    product_ticker: productTicker,
+                    brokerage,
+                    start_timing: startTiming,
+                    rebalance_frequency: rebalanceFrequency,
+                  });
+                  if (brokerage === "other" && otherBrokerage) p.set("brokerage_other", otherBrokerage);
+                  if (startTiming === "custom" && customDate) p.set("custom_date", customDate);
+                  if (linkedDeal) p.set("deal_id", String(linkedDeal.id));
+                  window.open(`/api/reports/implementation/${companyId}?${p}`, "_blank");
+                }}
                 className="py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <Printer className="w-5 h-5" />
