@@ -413,6 +413,7 @@ function EtfOptionsPanel({
             key={s.strategy_key}
             strategy={s}
             best={i === 0}
+            companyId={companyId}
             onTrack={() => setOpenTrack(s)}
           />
         ))}
@@ -455,10 +456,12 @@ function EtfOptionsPanel({
 function StrategyOptionCard({
   strategy,
   best,
+  companyId,
   onTrack,
 }: {
   strategy: EtfOptionStrategyApi;
   best?: boolean;
+  companyId: number;
   onTrack: () => void;
 }) {
   return (
@@ -524,10 +527,19 @@ function StrategyOptionCard({
       <p className="text-[11px] text-[color:var(--muted)] mb-4 italic leading-relaxed">
         <strong className="not-italic text-[color:var(--ink-2)]">Best for:</strong> {strategy.best_for}
       </p>
-      <button onClick={onTrack} className="btn btn-accent btn-sm w-full">
-        <TrendingUp className="h-3.5 w-3.5" />
-        Track This Position
-      </button>
+      <div className="flex gap-2">
+        <button onClick={onTrack} className="btn btn-accent btn-sm flex-1">
+          <TrendingUp className="h-3.5 w-3.5" />
+          Track This Position
+        </button>
+        <Link
+          href={`/modeler/${companyId}?strategy=${strategy.strategy_key}`}
+          className="btn btn-ghost btn-sm shrink-0"
+          title="Model this strategy across fuel-price scenarios"
+        >
+          Scenario Model
+        </Link>
+      </div>
     </div>
   );
 }

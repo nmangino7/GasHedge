@@ -625,7 +625,7 @@ function ImplementationPageInner() {
     const brokerages: { id: Brokerage; label: string; note: string }[] = [
       { id: "charles_schwab", label: "Charles Schwab", note: "$0 ETF commissions, integrated advisor portal" },
       { id: "fidelity", label: "Fidelity", note: "$0 ETF commissions, low margin rates" },
-      { id: "interactive_brokers", label: "Interactive Brokers", note: "Best for futures/options (Series 3)" },
+      { id: "interactive_brokers", label: "Interactive Brokers", note: "Broad options approval, multi-leg friendly, tight spreads" },
       { id: "td_ameritrade", label: "TD Ameritrade", note: "ThinkOrSwim platform — strong charting" },
       { id: "other", label: "Other", note: "Type the brokerage name below" },
     ];

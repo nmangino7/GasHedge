@@ -34,12 +34,13 @@ const TOOL_DEFS = [
   { slug: "risk-score", label: "Risk Score", icon: Shield },
   { slug: "budget", label: "Budget Modeler", icon: Calculator },
   { slug: "hedging", label: "Strategy Compare", icon: BarChart3 },
+  { slug: "modeler", label: "Scenario Modeler", icon: Calculator },
   { slug: "implementation", label: "Implementation Plan", icon: FileText },
 ];
 
 function extractCompanyId(pathname: string): string | null {
   const match = pathname.match(
-    /^\/(companies|risk-score|budget|implementation|hedging|reports)\/(\d+)/
+    /^\/(companies|risk-score|budget|implementation|hedging|reports|modeler)\/(\d+)/
   );
   return match ? match[2] : null;
 }

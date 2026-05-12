@@ -223,17 +223,16 @@ export async function GET(
       .map((c) => `<li>${escapeHtml(c)}</li>`)
       .join("");
 
-    const compareTableRows = (["etf", "options", "futures"] as const)
+    const compareTableRows = (["etf", "etf_options"] as const)
       .map((k) => {
         const isSelected = plan.approach === k;
-        const license = k === "etf" ? "Series 65/66 (advisory)" : "Series 3 required";
         return `
-          <tr style="${isSelected ? "background:#eef2ff;" : ""}">
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;${isSelected ? "color:#4f46e5;" : ""}">
+          <tr style="${isSelected ? "background:#fbece0;" : ""}">
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;${isSelected ? "color:#b86620;" : ""}">
               ${APPROACH_LABELS[k]}${isSelected ? " ← selected" : ""}
             </td>
             <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${escapeHtml(APPROACH_PLAIN[k])}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${license}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">Series 65/66 advisory</td>
           </tr>
         `;
       })
