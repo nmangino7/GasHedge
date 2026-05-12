@@ -16,6 +16,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  BookOpen,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/deals", label: "Deals & Revenue", icon: DollarSign },
   { href: "/tracker", label: "Live Tracker", icon: Activity, badge: "LIVE" },
   { href: "/etfs", label: "ETF Library", icon: Library },
+  { href: "/sources", label: "Sources", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

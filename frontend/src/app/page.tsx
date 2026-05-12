@@ -101,12 +101,12 @@ export default function Dashboard() {
                   Market Live
                 </span>
               </div>
-              <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-white">
-                Fuel Cost Risk Dashboard
+              <h1 className="font-display text-4xl md:text-6xl font-bold tracking-tight text-white leading-[1.05]">
+                Fuel cost risk,<br />measured and managed.
               </h1>
-              <p className="text-white/55 text-sm md:text-[15px] mt-2 max-w-xl leading-relaxed">
-                Institutional-grade hedging strategies for small businesses. ETF + options coverage, live position
-                tracking, and client-ready reports — all under one Series 65/66 advisory.
+              <p className="text-white/60 text-[15px] md:text-[17px] mt-4 max-w-xl leading-relaxed">
+                Institutional-grade hedging strategies for small businesses. Live ETF prices, full
+                options chains, and Black-Scholes pricing &mdash; every number sourced.
               </p>
             </div>
             {volatility && (
@@ -326,11 +326,51 @@ export default function Dashboard() {
         )}
       </div>
 
-      <p className="text-[11px] text-[color:var(--muted-2)] mt-10 max-w-2xl">
-        <BarChart3 className="h-3 w-3 inline-block mr-1" />
-        Hedging recommendations are informational and constitute advice under a Series 65/66 registration. Securities
-        recommended are registered investment products. Past performance does not guarantee future results.
-      </p>
+      <div className="mt-12 surface p-5" style={{ background: "var(--bg)" }}>
+        <p className="text-[11px] text-[color:var(--muted)] leading-relaxed max-w-3xl">
+          <BarChart3 className="h-3 w-3 inline-block mr-1" />
+          <strong className="text-[color:var(--ink-2)]">Data sources.</strong> Live ETF quotes via{" "}
+          <a
+            href="https://finance.yahoo.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline underline-offset-2"
+            style={{ color: "var(--accent)" }}
+          >
+            Yahoo Finance
+          </a>
+          . Retail gasoline/diesel from{" "}
+          <a
+            href="https://www.eia.gov/petroleum/gasdiesel/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline underline-offset-2"
+            style={{ color: "var(--accent)" }}
+          >
+            U.S. EIA
+          </a>
+          . ETF reference data from{" "}
+          <a
+            href="https://www.uscfinvestments.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline underline-offset-2"
+            style={{ color: "var(--accent)" }}
+          >
+            USCF Investments
+          </a>
+          . Options theoretical values use Black-Scholes (Black & Scholes, 1973). Recommendations
+          are advisory under a Series 65/66 registration. Past performance does not guarantee
+          future results.{" "}
+          <Link
+            href="/sources"
+            className="font-semibold underline underline-offset-2"
+            style={{ color: "var(--accent)" }}
+          >
+            Full sources &amp; methodology →
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
