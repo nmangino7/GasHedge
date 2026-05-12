@@ -12,13 +12,19 @@ import {
   FileText,
   Activity,
   Flame,
+  Library,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
+import { useTheme } from "./ThemeProvider";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: BarChart3 },
   { href: "/companies", label: "Clients", icon: Building2 },
   { href: "/deals", label: "Deals & Revenue", icon: DollarSign },
   { href: "/tracker", label: "Live Tracker", icon: Activity, badge: "LIVE" },
+  { href: "/etfs", label: "ETF Library", icon: Library },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -44,6 +50,7 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const activeCompanyId = extractCompanyId(pathname);
+  const { theme, setTheme } = useTheme();
   const toolItems = TOOL_DEFS.map((t) => ({
     ...t,
     href: activeCompanyId ? `/${t.slug}/${activeCompanyId}` : null,
@@ -200,6 +207,37 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* Theme toggle */}
+        <div className="px-4 pb-3">
+          <div
+            className="rounded-xl p-1 border border-white/10 grid grid-cols-3 gap-0.5"
+            style={{ background: "rgba(255, 255, 255, 0.03)" }}
+          >
+            {([
+              { id: "light", icon: Sun, label: "Light" },
+              { id: "dark", icon: Moon, label: "Dark" },
+              { id: "system", icon: Monitor, label: "Auto" },
+            ] as const).map((t) => {
+              const active = theme === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition-colors"
+                  style={{
+                    background: active ? "rgba(212, 118, 42, 0.22)" : "transparent",
+                    color: active ? "#f4b07a" : "rgba(255, 255, 255, 0.55)",
+                  }}
+                  title={t.label}
+                >
+                  <t.icon className="h-3.5 w-3.5" strokeWidth={active ? 2.4 : 2} />
+                  <span className="text-[9px] font-semibold tracking-wider uppercase">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Footer card */}
         <div className="px-4 pb-4">

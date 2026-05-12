@@ -150,6 +150,48 @@ export default function TrackerPage() {
         </div>
       </div>
 
+      {/* === Portfolio Greeks === */}
+      {aggregate && aggregate.open_count > 0 && (
+        <div className="surface p-5 mb-7">
+          <h3 className="h-section mb-3">Portfolio Greeks (Net Exposure)</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <GreekTile
+              label="Delta"
+              value={aggregate.portfolio_delta.toLocaleString()}
+              sub="Δ per $1 ETF move (net shares)"
+              positiveGood
+              raw={aggregate.portfolio_delta}
+            />
+            <GreekTile
+              label="Gamma"
+              value={aggregate.portfolio_gamma.toFixed(2)}
+              sub="Δ change per $1 ETF move"
+              positiveGood
+              raw={aggregate.portfolio_gamma}
+            />
+            <GreekTile
+              label="Theta"
+              value={`$${aggregate.portfolio_theta.toFixed(0)}`}
+              sub="$ decay per calendar day"
+              positiveGood
+              raw={aggregate.portfolio_theta}
+            />
+            <GreekTile
+              label="Vega"
+              value={`$${aggregate.portfolio_vega.toFixed(0)}`}
+              sub="$ P&L per 1% IV change"
+              positiveGood
+              raw={aggregate.portfolio_vega}
+            />
+          </div>
+          <p className="text-[11px] text-[color:var(--muted-2)] mt-3 leading-relaxed">
+            Greeks aggregate every open contract. Positive delta means the portfolio profits when
+            ETFs rise (good for a fuel-cost hedge). Positive theta = you collect time decay daily;
+            negative = you pay it.
+          </p>
+        </div>
+      )}
+
       {/* === Ticker chips & live quotes === */}
       {data && Object.keys(data.quotes).length > 0 && (
         <div className="surface p-4 mb-7">
@@ -246,6 +288,33 @@ export default function TrackerPage() {
       </div>
 
       {addOpen && <AddPositionModal onClose={() => setAddOpen(false)} onCreated={() => load(true)} />}
+    </div>
+  );
+}
+
+function GreekTile({
+  label,
+  value,
+  sub,
+  raw,
+  positiveGood,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  raw: number;
+  positiveGood?: boolean;
+}) {
+  const color = positiveGood
+    ? raw >= 0
+      ? "var(--positive)"
+      : "var(--negative)"
+    : "var(--ink)";
+  return (
+    <div className="rounded-xl p-4 border" style={{ background: "var(--bg)", borderColor: "var(--line)" }}>
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-[color:var(--muted)]">{label}</p>
+      <p className="text-num text-[22px] font-bold mt-1" style={{ color }}>{value}</p>
+      <p className="text-[11px] text-[color:var(--muted-2)] mt-1">{sub}</p>
     </div>
   );
 }

@@ -340,7 +340,9 @@ export default function ReportsPage() {
           {activeSection === "all-strategies" && (
             <div className="space-y-4">
               <div className="surface" style={{ padding: 0, overflow: "hidden" }}>
-                <h3 className="h-section px-5 pt-5 pb-3">All Hedging Approaches Compared</h3>
+                <h3 className="h-section px-5 pt-5 pb-3">
+                  ETF + ETF Options Approaches (Series 65/66 advisory)
+                </h3>
                 {allStrategies ? (
                   <div className="overflow-x-auto">
                     <table className="tbl">
@@ -352,12 +354,23 @@ export default function ReportsPage() {
                           <th>Max Loss</th>
                           <th>Correlation</th>
                           <th>Complexity</th>
-                          <th>License</th>
                           <th>Best For</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {((allStrategies as { comparison?: { approach: string; annual_cost: number; upfront_capital: number; max_loss: string; correlation: string; complexity: string; license: string; best_for: string }[] }).comparison || []).map((c) => (
+                        {(
+                          (allStrategies as {
+                            comparison?: {
+                              approach: string;
+                              annual_cost: number;
+                              upfront_capital: number;
+                              max_loss: string;
+                              correlation: string;
+                              complexity: string;
+                              best_for: string;
+                            }[];
+                          }).comparison || []
+                        ).map((c) => (
                           <tr key={c.approach}>
                             <td className="font-semibold">{c.approach}</td>
                             <td className="right num">${c.annual_cost.toLocaleString()}</td>
@@ -367,13 +380,16 @@ export default function ReportsPage() {
                             <td>
                               <span
                                 className={`pill ${
-                                  c.complexity === "Low" ? "pill-positive" : c.complexity === "Medium" ? "pill-warning" : "pill-negative"
+                                  c.complexity === "Low"
+                                    ? "pill-positive"
+                                    : c.complexity === "Medium"
+                                    ? "pill-warning"
+                                    : "pill-negative"
                                 }`}
                               >
                                 {c.complexity}
                               </span>
                             </td>
-                            <td className="text-[11px]">{c.license}</td>
                             <td className="text-[11px] text-[color:var(--muted)]">{c.best_for}</td>
                           </tr>
                         ))}
@@ -383,6 +399,15 @@ export default function ReportsPage() {
                 ) : (
                   <p className="text-sm text-[color:var(--muted)] px-5 pb-5">Loading strategy comparison...</p>
                 )}
+              </div>
+              <div className="surface p-5" style={{ background: "var(--bg)" }}>
+                <p className="text-[12px] text-[color:var(--muted)] leading-relaxed">
+                  <strong className="text-[color:var(--ink-2)]">Scope note.</strong> Series 3
+                  strategies (commodity futures, options on RBOB/ULSD futures) are not offered on this
+                  platform. All recommendations are Series 65/66 advisory; the client executes through
+                  their own brokerage or via a managed account where the adviser holds appropriate
+                  authorization. No commissions are collected on options trades.
+                </p>
               </div>
             </div>
           )}

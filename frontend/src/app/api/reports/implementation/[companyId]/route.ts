@@ -4,8 +4,7 @@ import { getCurrentPrice } from "@/lib/eia-service";
 import { getETFPrice } from "@/lib/alpha-vantage";
 import {
   calculateHedgePosition,
-  calculateOptionsStrategy,
-  calculateFuturesStrategy,
+  calculateEtfLongCall,
   detailedScenarioAnalysis,
 } from "@/lib/hedging-engine";
 
@@ -18,56 +17,42 @@ const escapeHtml = (s: string) =>
   );
 
 const APPROACH_LABELS: Record<string, string> = {
-  etf: "ETF-Based Hedging",
-  options: "Options Contracts",
-  futures: "Futures Contracts",
+  etf: "ETF Allocation",
+  etf_options: "ETF Options Overlay",
 };
 
 const APPROACH_PLAIN: Record<string, string> = {
   etf: "Buying shares of a fuel-tracking exchange-traded fund. When fuel prices rise, the fund's share price rises too. We sell shares to offset higher fuel bills. Simplest approach.",
-  options: "Buying call options on RBOB or ULSD futures. Like buying insurance — pay a one-time premium up front. If fuel spikes, the option pays out. If prices stay flat, the most we lose is the premium.",
-  futures: "Direct fuel futures contracts on NYMEX. Strongest hedge — moves dollar-for-dollar with wholesale fuel. Requires margin and active management, but tightest tracking.",
+  etf_options: "Buying call options on the fuel-tracking ETF. Pay a one-time premium up front, capped downside (the premium), unlimited upside protection if fuel spikes. Series 65/66 advisory only — no Series 3 needed.",
 };
 
 const APPROACH_PROS: Record<string, string[]> = {
   etf: [
     "Only Series 65/66 needed (advisor's existing license)",
-    "Liquid — sell any time market hours",
+    "Liquid — sell any time during market hours",
     "No margin calls or expiry",
     "Works in any standard brokerage account",
   ],
-  options: [
-    "Maximum loss capped at premium paid",
-    "90-95% correlation with retail fuel prices",
-    "Pays off explosively during fuel spikes",
-    "Lower up-front capital than full futures coverage",
-  ],
-  futures: [
-    "Highest correlation (92-95%) — closest to a perfect hedge",
-    "No annual expense ratio",
-    "Highly liquid on NYMEX",
-    "Transparent daily mark-to-market",
+  etf_options: [
+    "Series 65/66 advisory — client executes in own brokerage",
+    "Maximum loss capped at the premium paid",
+    "Unlimited upside if fuel spikes",
+    "Spreads (bull call, bear put) cut premium 40–60%",
   ],
 };
 
 const APPROACH_CONS: Record<string, string[]> = {
   etf: [
-    "Tracking error vs retail fuel (~78-88% correlation)",
+    "Tracking error vs retail fuel (~78–88% correlation)",
     "~1% annual expense ratio",
     "K-1 tax form required",
     "Contango losses possible",
   ],
-  options: [
-    "Series 3 license required",
-    "Premium is real cost if prices stay flat",
-    "Options expire — must roll positions",
+  etf_options: [
+    "Premium is a real cost if fuel stays flat",
+    "Options expire — must roll positions to maintain coverage",
+    "Client account must be options-approved (Level 2+)",
     "More complex pricing (strikes, IV, Greeks)",
-  ],
-  futures: [
-    "Series 3 license required",
-    "Margin calls possible if fuel prices fall",
-    "Daily settlement requires active management",
-    "Theoretically unlimited downside",
   ],
 };
 
@@ -183,7 +168,21 @@ export async function GET(
     let annualHedgeCost = 0;
     let breakevenPrice = fuelPrice;
 
-    if (plan.approach === "etf") {
+    if (plan.approach === "etf_options") {
+      const lc = calculateEtfLongCall({
+        monthlyGallons,
+        fuelType,
+        currentFuelPrice: fuelPrice,
+        ticker: plan.product_ticker,
+        etfPrice,
+        hedgeRatio: plan.hedge_ratio,
+        daysToExpiry: 120,
+      });
+      breakevenPrice = lc.breakeven_etf_price ?? etfPrice;
+      upfrontCapital = lc.total_premium;
+      annualHedgeCost = lc.total_premium;
+      positionSummary = `Buy <strong>${lc.contracts} ${plan.product_ticker} call option contracts</strong> at $${(etfPrice).toFixed(2)} strike (ATM, ~120-day expiry). Total premium: <strong>$${fmtMoney(lc.total_premium)}</strong>. Max loss capped at premium. Series 65/66 advisory.`;
+    } else {
       const pos = calculateHedgePosition(
         monthlyGallons,
         fuelType,
@@ -197,18 +196,6 @@ export async function GET(
       upfrontCapital = pos.dollar_notional;
       annualHedgeCost = pos.annual_expense_cost;
       positionSummary = `Buy <strong>${pos.shares_needed} shares</strong> of <strong>${pos.product_ticker}</strong> (${pos.product_name}) at roughly $${pos.etf_price.toFixed(2)}/share.`;
-    } else if (plan.approach === "options") {
-      const opt = calculateOptionsStrategy(monthlyGallons, fuelType, fuelPrice, plan.hedge_ratio);
-      breakevenPrice = opt.breakeven_price;
-      upfrontCapital = opt.total_premium;
-      annualHedgeCost = opt.total_premium;
-      positionSummary = `Buy <strong>${opt.contracts_needed} ${fuelType === "diesel" ? "ULSD" : "RBOB"} call option contracts</strong> at $${opt.strike_price}/gal strike, 6-month expiry. Total premium: <strong>$${fmtMoney(opt.total_premium)}</strong>.`;
-    } else {
-      const fut = calculateFuturesStrategy(monthlyGallons, fuelType, fuelPrice, plan.hedge_ratio);
-      breakevenPrice = fuelPrice;
-      upfrontCapital = fut.total_margin_required;
-      annualHedgeCost = 0;
-      positionSummary = `Buy <strong>${fut.contracts_needed} ${fuelType === "diesel" ? "ULSD" : "RBOB"} futures contracts</strong>. Margin required: <strong>$${fmtMoney(fut.total_margin_required)}</strong> (${fut.contracts_needed} × $${fmtMoney(fut.margin_per_contract)}).`;
     }
 
     const deals = await dealStore.list(undefined, company.id);
@@ -405,8 +392,7 @@ export async function GET(
     <p style="margin:0"><span class="step-number">6</span><strong>Cost breakdown</strong></p>
     <p style="margin:8px 0 0;font-size:13px">
       ${plan.approach === "etf" ? `Annual ETF expense: <strong>$${fmtMoney(annualHedgeCost)}/yr</strong><br>` : ""}
-      ${plan.approach === "options" ? `Premium (paid up front): <strong>$${fmtMoney(annualHedgeCost)}</strong><br>` : ""}
-      ${plan.approach === "futures" ? `Margin tied up: <strong>$${fmtMoney(upfrontCapital)}</strong> (refundable)<br>` : ""}
+      ${plan.approach === "etf_options" ? `Premium (paid up front): <strong>$${fmtMoney(annualHedgeCost)}</strong><br>` : ""}
       Trading commissions: typically $0 at major brokers<br>
       Advisor fee: see compensation transparency section below<br>
       <strong>Total run-rate cost: $${fmtMoney(annualHedgeCost + advisorAnnualRevenue)}/year</strong>
@@ -417,8 +403,7 @@ export async function GET(
     <p style="margin:0"><span class="step-number">7</span><strong>Exit strategy</strong></p>
     <p style="margin:8px 0 0;font-size:13px">
       ${plan.approach === "etf" ? `To unwind, sell shares using a limit order during market hours. Settlement is T+1. <strong>Tax note:</strong> ${plan.product_ticker} issues a K-1 form &mdash; gains taxed at a blended 60% long-term / 40% short-term rate.` : ""}
-      ${plan.approach === "options" ? `Options expire in 6 months. Either let them expire worthless (if not in the money) or exercise/sell early. Roll into new contracts to maintain coverage.` : ""}
-      ${plan.approach === "futures" ? `Close out by entering an offsetting trade. Daily P&L flows through cash settlement. Consult tax advisor &mdash; futures use Section 1256 60/40 tax treatment.` : ""}
+      ${plan.approach === "etf_options" ? `Options expire on the chosen expiration date. Either let them expire worthless (if out of the money) or close early by selling. Roll into new contracts to maintain coverage. Series 65/66 advisory only &mdash; client executes via own brokerage.` : ""}
     </p>
   </div>
 
@@ -443,8 +428,8 @@ export async function GET(
   <p style="font-size:13px;color:#6b7280">Start date: <strong>${escapeHtml(startDate)}</strong></p>
 
   <h2>7. Important disclosures</h2>
-  <p class="disclaimer">This plan is provided under an advisory relationship for informational purposes. Securities recommended are limited to registered investment products (ETFs, mutual funds) for which the adviser is licensed under Series 65/66. Options and futures recommendations require a Series 3 license. Past performance does not guarantee future results.</p>
-  <p class="disclaimer">Commodity ETFs structured as limited partnerships issue Schedule K-1 tax forms. Gains are typically taxed 60% long-term / 40% short-term, regardless of holding period. Hedging strategies should be evaluated against each company&rsquo;s specific financial situation and risk tolerance.</p>
+  <p class="disclaimer">This plan is provided under an advisory relationship for informational purposes. Securities recommended are limited to registered investment products (ETFs) and listed equity options on those ETFs &mdash; all under the adviser&rsquo;s Series 65/66 registration. The adviser does NOT offer commodity futures, swaps, or options on futures (Series 3 products). Past performance does not guarantee future results.</p>
+  <p class="disclaimer">Commodity ETFs structured as limited partnerships issue Schedule K-1 tax forms. Gains are typically taxed 60% long-term / 40% short-term, regardless of holding period (Section 1256). Hedging strategies should be evaluated against each company&rsquo;s specific financial situation and risk tolerance.</p>
   <p class="disclaimer">HYPOTHETICAL PERFORMANCE RESULTS have many inherent limitations. ETF-based hedging involves market risk and does not guarantee cost savings. Futures involve margin call risk and theoretically unlimited loss exposure.</p>
   <p class="disclaimer" style="margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb">Generated by GasHedge &mdash; ${new Date().toISOString()}${planId ? ` &mdash; Plan ID #${planId}` : ""}</p>
 </body>

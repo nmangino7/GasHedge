@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import ChatSidebar from "./ChatSidebar";
+import MarketTicker from "./MarketTicker";
 import { Menu, Flame } from "lucide-react";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -36,11 +37,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 min-h-0">
         <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main
-          className="flex-1 overflow-auto"
-          style={{ background: "var(--bg)" }}
-        >
-          <div className="max-w-7xl mx-auto px-4 py-6 md:px-10 md:py-10 animate-in">
+        <main className="flex-1 overflow-auto flex flex-col" style={{ background: "var(--bg)" }}>
+          <MarketTicker />
+          <div className="max-w-7xl mx-auto px-4 py-6 md:px-10 md:py-10 animate-in w-full">
             {children}
           </div>
         </main>

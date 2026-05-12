@@ -205,6 +205,9 @@ export interface LivePositionRow extends OptionPositionApi {
     unrealized_pnl_pct: number;
     days_to_expiry: number;
     delta: number;
+    gamma: number;
+    theta: number;
+    vega: number;
     intrinsic_value_per_share: number;
     time_value_per_share: number;
     iv_used: number;
@@ -223,6 +226,10 @@ export interface LiveTrackerResponse {
     total_unrealized_pnl: number;
     total_unrealized_pnl_pct: number;
     tickers: string[];
+    portfolio_delta: number;
+    portfolio_gamma: number;
+    portfolio_theta: number;
+    portfolio_vega: number;
   };
   quotes_error: string | null;
   as_of: string;

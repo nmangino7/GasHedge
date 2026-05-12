@@ -58,6 +58,10 @@ export async function GET(request: NextRequest) {
   const totalCurrent = enriched.reduce((acc, p) => acc + p.live.current_total_value, 0);
   const totalPnl = enriched.reduce((acc, p) => acc + p.live.unrealized_pnl, 0);
   const totalPnlPct = totalEntry !== 0 ? (totalPnl / Math.abs(totalEntry)) * 100 : 0;
+  const portfolioDelta = enriched.reduce((acc, p) => acc + p.live.delta, 0);
+  const portfolioGamma = enriched.reduce((acc, p) => acc + p.live.gamma, 0);
+  const portfolioTheta = enriched.reduce((acc, p) => acc + p.live.theta, 0);
+  const portfolioVega = enriched.reduce((acc, p) => acc + p.live.vega, 0);
 
   // Pull company names for display
   const companies = await companyStore.list();
@@ -77,6 +81,10 @@ export async function GET(request: NextRequest) {
       total_unrealized_pnl: Math.round(totalPnl * 100) / 100,
       total_unrealized_pnl_pct: Math.round(totalPnlPct * 100) / 100,
       tickers: uniqueTickers,
+      portfolio_delta: Math.round(portfolioDelta),
+      portfolio_gamma: Math.round(portfolioGamma * 100) / 100,
+      portfolio_theta: Math.round(portfolioTheta * 100) / 100,
+      portfolio_vega: Math.round(portfolioVega * 100) / 100,
     },
     quotes_error: quotesError,
     as_of: new Date().toISOString(),

@@ -24,7 +24,7 @@ import type { Deal } from "@/lib/types";
 import { dealsApi, hedgingPlansApi } from "@/lib/api";
 import { FEE_STRUCTURES } from "@/lib/constants";
 
-type HedgingApproach = "etf" | "options" | "futures" | "";
+type HedgingApproach = "etf" | "etf_options" | "";
 type StrategyTier = "conservative" | "moderate" | "aggressive" | "";
 type Brokerage =
   | "charles_schwab"
@@ -52,70 +52,47 @@ const APPROACH_DETAILS: Record<
   }
 > = {
   etf: {
-    title: "ETF-Based Hedging",
+    title: "ETF Allocation",
     plain:
-      "Buy shares of a fund that goes up when fuel prices go up. Hold while fuel costs are high; sell when prices ease. The simplest way to offset rising fuel bills — works through any normal brokerage account.",
+      "Buy shares of a fund that rises with fuel prices. Hold while fuel costs are high; sell when prices ease. The simplest fuel hedge — through any normal brokerage account.",
     pros: [
-      "Open with your existing Series 65/66 license — no new exam.",
-      "Sell shares any time during market hours; cash settles next day.",
-      "No margin calls, no expiry, no daily settlement headaches.",
-      "Lowest barrier to entry — clients can fund a $10k position and start tomorrow.",
+      "Series 65/66 advisory — no other license needed.",
+      "Sell any time during market hours; cash settles next day.",
+      "No margin calls, no expiry, no daily settlement.",
+      "Lowest barrier to entry — start at any capital level.",
     ],
     cons: [
       "Tracking error: ETFs don't move 1-for-1 with retail pump prices (0.78–0.88 correlation).",
       "Annual expense ratio (~1%) eats a small slice each year.",
-      "Issues a K-1 tax form (limited-partnership structure) — extra paperwork.",
-      "Contango losses: in contango, the fund loses value even if oil holds flat.",
+      "K-1 tax form (limited-partnership structure) — extra paperwork at tax time.",
+      "Contango losses: in contango, the fund loses value even if oil is flat.",
     ],
     cost: "Capital required ≈ annual fuel cost × hedge % ÷ correlation. Plus ~1%/yr expense.",
-    license: "Series 65/66 — what you hold.",
-    bestFor:
-      "First-time hedgers, smaller fleets, advisors who want a clean one-account solution clients can understand.",
+    license: "Series 65/66 advisory.",
+    bestFor: "Foundation hedge — first-time hedgers, smaller fleets, conservative clients.",
     risk: "Low",
   },
-  options: {
-    title: "Options Contracts",
+  etf_options: {
+    title: "ETF Options Overlay",
     plain:
-      "Pay a one-time premium up front, like buying insurance. If fuel spikes, the option pays out big. If prices stay flat or drop, max loss is the premium paid. Great for capping downside.",
+      "Buy or sell options on the same fuel ETFs. Long calls give you uncapped upside protection for a known premium. Collars bracket exposure. Covered calls generate income on top of an existing ETF position.",
     pros: [
-      "Maximum loss capped at the premium — no surprise margin calls.",
-      "90–95% correlation with retail fuel because it tracks RBOB / ULSD futures.",
-      "Cheaper than full futures coverage — premium is a fraction of notional.",
-      "Pays off explosively during fuel spikes.",
+      "Series 65/66 advisory — client executes in their own brokerage or managed account.",
+      "Spread strategies (bull call, bear put) cut premium cost by 40–60% versus naked options.",
+      "Defined-risk structures (collar, iron condor) give clients a known worst case.",
+      "Can layer on top of an existing ETF allocation to add yield or sharpen protection.",
     ],
     cons: [
-      "Requires the Series 3 license (~80 hours, $140 exam).",
-      "If prices stay flat, you lose the premium with nothing to show.",
-      "Options expire (typically 6 months). You roll to stay hedged.",
-      "Pricing is more opaque than ETFs — strikes, IVs, and Greeks matter.",
+      "Client account must be approved for options (Level 2 for long, Level 3 for spreads).",
+      "Options expire — positions need to be rolled to maintain coverage.",
+      "Pricing is more nuanced: strikes, IVs, and Greeks matter.",
+      "Multi-leg structures (collar, iron condor) take more education to explain to a small-business owner.",
     ],
-    cost: "Premium ≈ 6.5% of hedged notional. No ongoing expense ratio.",
-    license: "Series 3 (commodity futures) required.",
+    cost: "Premium varies: 1–7% of notional for long structures; spreads typically 40–60% cheaper.",
+    license: "Series 65/66 advisory.",
     bestFor:
-      "Cost-conscious clients who want catastrophic-spike protection without tying up large amounts of capital.",
+      "Clients who want capped-downside protection, income overlays, or precise range-bound views — all without leaving the equity-options world.",
     risk: "Medium",
-  },
-  futures: {
-    title: "Futures Contracts",
-    plain:
-      "A binding agreement to buy fuel later at today's price. Strongest possible hedge — moves dollar-for-dollar with wholesale fuel — but requires margin and can lose money if prices fall.",
-    pros: [
-      "Highest correlation to retail fuel (92–95%) — closest thing to a perfect hedge.",
-      "No expense ratio. You only pay margin and tiny per-contract commissions.",
-      "Highly liquid — RBOB and ULSD futures trade massive volume on NYMEX.",
-      "Predictable settlement, daily mark-to-market — full transparency.",
-    ],
-    cons: [
-      "Requires the Series 3 license.",
-      "Margin calls: if fuel falls, you may need to deposit cash same-day.",
-      "Unlimited theoretical downside on the long side.",
-      "Daily settlement + position management = active management every business day.",
-    ],
-    cost: "Margin ≈ 10% of notional. Minimal commissions. No ongoing fee.",
-    license: "Series 3 (commodity futures) required.",
-    bestFor:
-      "Larger fleets (>20k gallons/month) where the correlation upgrade is worth the daily management.",
-    risk: "High",
   },
 };
 
@@ -181,10 +158,8 @@ const TIER_DETAILS: Record<
 const TICKER_BY_APPROACH_AND_FUEL: Record<string, string> = {
   "etf-gasoline": "UGA",
   "etf-diesel": "USO",
-  "options-gasoline": "RBOB",
-  "options-diesel": "ULSD",
-  "futures-gasoline": "RBOB",
-  "futures-diesel": "ULSD",
+  "etf_options-gasoline": "UGA",
+  "etf_options-diesel": "USO",
 };
 
 const riskPill = (risk: "Low" | "Medium" | "High"): string =>
@@ -396,7 +371,7 @@ function ImplementationPageInner() {
               </tr>
             </thead>
             <tbody>
-              {(["etf", "options", "futures"] as const).map((k) => {
+              {(["etf", "etf_options"] as const).map((k) => {
                 const d = APPROACH_DETAILS[k];
                 return (
                   <tr key={k} className="border-b border-white/10 last:border-0">
@@ -529,8 +504,7 @@ function ImplementationPageInner() {
   function Step1() {
     const approaches: { id: HedgingApproach; icon: React.ReactNode }[] = [
       { id: "etf", icon: <BarChart3 className="w-6 h-6" /> },
-      { id: "options", icon: <Shield className="w-6 h-6" /> },
-      { id: "futures", icon: <TrendingUp className="w-6 h-6" /> },
+      { id: "etf_options", icon: <Shield className="w-6 h-6" /> },
     ];
 
     return (

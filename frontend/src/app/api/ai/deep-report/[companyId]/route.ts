@@ -112,14 +112,12 @@ FUEL EXPOSURE:
 - Annual Fuel Cost: $${exposure.annual_fuel_cost.toLocaleString()}
 - Fuel as % of Revenue: ${exposure.fuel_pct_revenue || "N/A"}%
 
-STRATEGY OPTIONS AVAILABLE:
-ETF Strategies: ${JSON.stringify(allStrategies.etf.map(s => ({ tier: s.tier, investment: s.position.dollar_notional, annual_cost: s.position.annual_expense_cost, shares: s.position.shares_needed })), null, 2)}
+STRATEGY OPTIONS AVAILABLE (Series 65/66 advisory only — ETF + ETF options):
+ETF Allocation Strategies: ${JSON.stringify(allStrategies.etf.map(s => ({ tier: s.tier, investment: s.position.dollar_notional, annual_cost: s.position.annual_expense_cost, shares: s.position.shares_needed })), null, 2)}
 
-Options Strategy: ${JSON.stringify(allStrategies.options, null, 2)}
+ETF Options Strategies: ${JSON.stringify(allStrategies.comparison, null, 2)}
 
-Futures Strategy: ${JSON.stringify(allStrategies.futures, null, 2)}
-
-Please write the full 10-section advisory report covering all approaches.`,
+Please write a comprehensive advisory report covering both approaches. Do NOT reference commodity futures, options on futures, or any Series 3 strategies — the adviser holds Series 65/66 only.`,
         },
       ],
     });

@@ -346,77 +346,9 @@ export function historicalBacktest(
   };
 }
 
-// --- Options Strategy ---
-// Call options on fuel futures (RBOB gasoline or ULSD diesel)
-export function calculateOptionsStrategy(
-  monthlyGallons: number,
-  fuelType: string,
-  currentFuelPrice: number,
-  hedgeRatio: number = 0.5
-) {
-  const annualGallons = monthlyGallons * 12;
-  const gallonsToHedge = annualGallons * hedgeRatio;
-  const contractSize = 42000; // Standard futures contract = 42,000 gallons
-  const contractsNeeded = Math.max(1, Math.round(gallonsToHedge / contractSize));
-  const actualGallonsHedged = contractsNeeded * contractSize;
-
-  // Option premium estimate: ~5-8% of notional for 6-month at-the-money call
-  const notionalPerContract = contractSize * currentFuelPrice;
-  const premiumRate = 0.065; // ~6.5% of notional
-  const premiumPerContract = notionalPerContract * premiumRate;
-  const totalPremium = premiumPerContract * contractsNeeded;
-
-  const strikePrice = currentFuelPrice; // At-the-money
-  const breakevenPrice = currentFuelPrice * (1 + premiumRate);
-
-  return {
-    approach: "options" as const,
-    contracts_needed: contractsNeeded,
-    contract_size_gallons: contractSize,
-    total_premium: Math.round(totalPremium),
-    max_loss: Math.round(totalPremium), // Max loss = premium paid
-    breakeven_price: Math.round(breakevenPrice * 1000) / 1000,
-    strike_price: Math.round(strikePrice * 1000) / 1000,
-    expiry_months: 6,
-    license_required: "Series 3" as const,
-    description: `Buy ${contractsNeeded} ${fuelType === "diesel" ? "ULSD" : "RBOB"} call option contracts at $${strikePrice.toFixed(3)} strike. Total premium: $${totalPremium.toLocaleString()}. Max downside is the premium paid. Profitable when ${fuelType} exceeds $${breakevenPrice.toFixed(3)}/gal.`,
-  };
-}
-
-// --- Futures Strategy ---
-// Direct futures hedging (RBOB gasoline or ULSD diesel)
-export function calculateFuturesStrategy(
-  monthlyGallons: number,
-  fuelType: string,
-  currentFuelPrice: number,
-  hedgeRatio: number = 0.5
-) {
-  const annualGallons = monthlyGallons * 12;
-  const gallonsToHedge = annualGallons * hedgeRatio;
-  const contractSize = 42000;
-  const contractsNeeded = Math.max(1, Math.round(gallonsToHedge / contractSize));
-
-  const notionalValue = contractsNeeded * contractSize * currentFuelPrice;
-  // Margin requirement: ~10% of notional for energy futures
-  const marginPerContract = Math.round(contractSize * currentFuelPrice * 0.10);
-  const totalMargin = marginPerContract * contractsNeeded;
-
-  const futuresCorrelation = fuelType === "diesel" ? 0.95 : 0.92; // Futures have higher correlation than ETFs
-
-  return {
-    approach: "futures" as const,
-    contracts_needed: contractsNeeded,
-    contract_size_gallons: contractSize,
-    margin_per_contract: marginPerContract,
-    total_margin_required: totalMargin,
-    notional_value: Math.round(notionalValue),
-    correlation: futuresCorrelation,
-    license_required: "Series 3" as const,
-    description: `Buy ${contractsNeeded} ${fuelType === "diesel" ? "ULSD" : "RBOB"} futures contracts. Margin required: $${totalMargin.toLocaleString()} (${contractsNeeded} × $${marginPerContract.toLocaleString()}). ${(futuresCorrelation * 100).toFixed(0)}% correlation to retail ${fuelType}. Strongest hedge but requires active management and Series 3 license.`,
-  };
-}
-
-// --- Compare All Strategies ---
+// --- Compare ETF Strategies ---
+// Series 65/66 advisory only: ETF outright vs ETF options strategies.
+// All Series 3 (commodity futures, options on futures) strategies were removed.
 export function compareAllStrategies(
   monthlyGallons: number,
   fuelType: string,
@@ -425,50 +357,57 @@ export function compareAllStrategies(
   hedgeRatio: number = 0.5
 ) {
   const etfStrategies = recommendStrategy(fuelType, monthlyGallons, currentFuelPrice, etfPrices);
-  const moderateETF = etfStrategies.find(s => s.tier === "moderate") || etfStrategies[1];
-  const options = calculateOptionsStrategy(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio);
-  const futures = calculateFuturesStrategy(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio);
+  const moderateETF = etfStrategies.find((s) => s.tier === "moderate") || etfStrategies[1];
 
   const comparison = [
     {
-      approach: "ETF",
+      approach: "ETF Allocation",
       annual_cost: moderateETF.position.annual_expense_cost,
       upfront_capital: moderateETF.position.dollar_notional,
       max_loss: "Unlimited (ETF can lose value)",
       correlation: `${(moderateETF.position.correlation_to_retail * 100).toFixed(0)}%`,
       liquidity: "High — sell anytime during market hours",
       complexity: "Low",
-      license: "Series 65/66 (advisory)",
-      best_for: "Most small businesses, simplest approach",
+      license: "Series 65/66 advisory",
+      best_for: "Foundation hedge — long-term coverage with predictable exposure",
     },
     {
-      approach: "Options",
-      annual_cost: options.total_premium,
-      upfront_capital: options.total_premium,
-      max_loss: `$${options.max_loss.toLocaleString()} (premium only)`,
-      correlation: "90-95% (direct fuel futures)",
-      liquidity: "Moderate — exchange-traded",
-      complexity: "Medium",
-      license: "Series 3 required",
-      best_for: "Cost-conscious hedgers who want capped downside",
-    },
-    {
-      approach: "Futures",
+      approach: "Long ETF Calls",
       annual_cost: 0,
-      upfront_capital: futures.total_margin_required,
-      max_loss: "Unlimited (margin calls possible)",
-      correlation: `${(futures.correlation * 100).toFixed(0)}%`,
-      liquidity: "High — exchange-traded",
-      complexity: "High",
-      license: "Series 3 required",
-      best_for: "Large fleets with sophisticated management",
+      upfront_capital: Math.round(moderateETF.position.dollar_notional * 0.07),
+      max_loss: "Premium only (capped)",
+      correlation: `${(moderateETF.position.correlation_to_retail * 100).toFixed(0)}%`,
+      liquidity: "High — exchange-traded options",
+      complexity: "Medium",
+      license: "Series 65/66 advisory",
+      best_for: "Cap-downside hedge — pay a premium for unlimited upside protection",
+    },
+    {
+      approach: "Collar",
+      annual_cost: 0,
+      upfront_capital: Math.round(moderateETF.position.dollar_notional * 0.01),
+      max_loss: "Defined by put strike",
+      correlation: `${(moderateETF.position.correlation_to_retail * 100).toFixed(0)}%`,
+      liquidity: "High — exchange-traded options",
+      complexity: "Medium",
+      license: "Series 65/66 advisory",
+      best_for: "Bracketed exposure — near-zero cost, capped upside, defined downside",
+    },
+    {
+      approach: "Covered Call",
+      annual_cost: 0,
+      upfront_capital: moderateETF.position.dollar_notional,
+      max_loss: "ETF downside, partially offset by premium",
+      correlation: `${(moderateETF.position.correlation_to_retail * 100).toFixed(0)}%`,
+      liquidity: "High — exchange-traded options",
+      complexity: "Medium",
+      license: "Series 65/66 advisory",
+      best_for: "Income overlay — generate monthly premium on an existing ETF hedge",
     },
   ];
 
   return {
     etf: etfStrategies,
-    options,
-    futures,
     comparison,
   };
 }
@@ -504,7 +443,10 @@ export type EtfOptionStrategyKey =
   | "long_put"
   | "covered_call"
   | "short_put"
-  | "collar";
+  | "collar"
+  | "bull_call_spread"
+  | "bear_put_spread"
+  | "iron_condor";
 
 export interface EtfOptionStrategyInput {
   monthlyGallons: number;
@@ -957,6 +899,190 @@ export function calculateEtfCollar(
   };
 }
 
+// Bull Call Spread — long call at ATM, short call OTM. Cheaper than long call,
+// capped upside. Good middle ground for cost-sensitive fuel hedgers.
+export function calculateEtfBullCallSpread(input: EtfOptionStrategyInput): EtfOptionStrategyResult {
+  const {
+    monthlyGallons, fuelType, currentFuelPrice, ticker, etfPrice,
+    hedgeRatio = 0.5, daysToExpiry = 120, impliedVol,
+  } = input;
+  const iv = impliedVol ?? getDefaultIV(ticker);
+  const longStrike = round2(etfPrice * 1.0);
+  const shortStrike = round2(etfPrice * 1.12);
+  const contracts = notionalContractsForHedge(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio, ticker, etfPrice);
+  const bsLong = pricesAt(etfPrice, longStrike, iv, daysToExpiry);
+  const bsShort = pricesAt(etfPrice, shortStrike, iv, daysToExpiry);
+  const longDebit = bsLong.callPrice * 100 * contracts;
+  const shortCredit = bsShort.callPrice * 100 * contracts;
+  const netDebit = longDebit - shortCredit;
+  const maxGain = (shortStrike - longStrike) * 100 * contracts - netDebit;
+
+  return {
+    strategy_key: "bull_call_spread",
+    display_name: "Bull Call Spread (Capped Upside, Lower Cost)",
+    ticker,
+    expiry_days: daysToExpiry,
+    underlying_price: etfPrice,
+    contracts,
+    total_premium: round2(netDebit),
+    total_premium_label: `$${Math.round(netDebit).toLocaleString()} net debit`,
+    max_loss: round2(netDebit),
+    max_gain: round2(maxGain),
+    breakeven_etf_price: round2(longStrike + netDebit / (100 * contracts)),
+    net_delta: round4((bsLong.callDelta - bsShort.callDelta) * contracts * 100),
+    hedge_fit: 0.85,
+    legs: [
+      {
+        side: "long", option_type: "call", strike: longStrike,
+        premium_per_share: round2(bsLong.callPrice), contracts,
+        delta: round4(bsLong.callDelta), gamma: round4(bsLong.gamma),
+        theta_per_day: round4(bsLong.callTheta), vega: round4(bsLong.vega), iv_used: iv,
+      },
+      {
+        side: "short", option_type: "call", strike: shortStrike,
+        premium_per_share: round2(bsShort.callPrice), contracts,
+        delta: round4(-bsShort.callDelta), gamma: round4(-bsShort.gamma),
+        theta_per_day: round4(-bsShort.callTheta), vega: round4(-bsShort.vega), iv_used: iv,
+      },
+    ],
+    description: `Buy ${contracts} ${ticker} $${longStrike.toFixed(2)} call + sell ${contracts} $${shortStrike.toFixed(2)} call (~${daysToExpiry} days). Net debit: $${Math.round(netDebit).toLocaleString()}. Profits between $${longStrike.toFixed(2)} and $${shortStrike.toFixed(2)}, capped at $${Math.round(maxGain).toLocaleString()}. Max loss: the net debit.`,
+    best_for: "Cost-sensitive clients who expect moderate fuel price increases but not a runaway spike.",
+    rationale:
+      "Bull call spread reduces the premium cost of a long call by selling a further-OTM call. You trade unlimited upside (which you rarely need) for a 40–60% lower premium. Excellent for tight-budget clients.",
+  };
+}
+
+// Bear Put Spread — long put ATM, short put OTM. Used as overlay on an existing ETF
+// position to protect against drops without paying the full put premium.
+export function calculateEtfBearPutSpread(input: EtfOptionStrategyInput): EtfOptionStrategyResult {
+  const {
+    monthlyGallons, fuelType, currentFuelPrice, ticker, etfPrice,
+    hedgeRatio = 0.5, daysToExpiry = 90, impliedVol,
+  } = input;
+  const iv = impliedVol ?? getDefaultIV(ticker);
+  const longStrike = round2(etfPrice * 1.0);
+  const shortStrike = round2(etfPrice * 0.88);
+  const contracts = notionalContractsForHedge(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio, ticker, etfPrice);
+  const bsLong = pricesAt(etfPrice, longStrike, iv, daysToExpiry);
+  const bsShort = pricesAt(etfPrice, shortStrike, iv, daysToExpiry);
+  const longDebit = bsLong.putPrice * 100 * contracts;
+  const shortCredit = bsShort.putPrice * 100 * contracts;
+  const netDebit = longDebit - shortCredit;
+  const maxGain = (longStrike - shortStrike) * 100 * contracts - netDebit;
+
+  return {
+    strategy_key: "bear_put_spread",
+    display_name: "Bear Put Spread (Defined-Range Downside Protection)",
+    ticker,
+    expiry_days: daysToExpiry,
+    underlying_price: etfPrice,
+    contracts,
+    total_premium: round2(netDebit),
+    total_premium_label: `$${Math.round(netDebit).toLocaleString()} net debit`,
+    max_loss: round2(netDebit),
+    max_gain: round2(maxGain),
+    breakeven_etf_price: round2(longStrike - netDebit / (100 * contracts)),
+    net_delta: round4((bsLong.putDelta - bsShort.putDelta) * contracts * 100),
+    hedge_fit: 0.35,
+    legs: [
+      {
+        side: "long", option_type: "put", strike: longStrike,
+        premium_per_share: round2(bsLong.putPrice), contracts,
+        delta: round4(bsLong.putDelta), gamma: round4(bsLong.gamma),
+        theta_per_day: round4(bsLong.putTheta), vega: round4(bsLong.vega), iv_used: iv,
+      },
+      {
+        side: "short", option_type: "put", strike: shortStrike,
+        premium_per_share: round2(bsShort.putPrice), contracts,
+        delta: round4(-bsShort.putDelta), gamma: round4(-bsShort.gamma),
+        theta_per_day: round4(-bsShort.putTheta), vega: round4(-bsShort.vega), iv_used: iv,
+      },
+    ],
+    description: `Buy ${contracts} ${ticker} $${longStrike.toFixed(2)} put + sell ${contracts} $${shortStrike.toFixed(2)} put (~${daysToExpiry} days). Net debit: $${Math.round(netDebit).toLocaleString()}. Protects ETF position between $${longStrike.toFixed(2)} and $${shortStrike.toFixed(2)}.`,
+    best_for: "Clients who already own the ETF and want defined-range downside protection at a fraction of the long-put cost.",
+    rationale:
+      "Pairs with an outright ETF position. Cheaper than a long put, gives meaningful downside protection across a defined band — usually the realistic worst-case range for the underlying.",
+  };
+}
+
+// Iron Condor — sell OTM call spread + OTM put spread. Collects premium for a
+// range-bound view. Useful for fuel ETFs when an advisor expects sideways prices.
+export function calculateEtfIronCondor(input: EtfOptionStrategyInput): EtfOptionStrategyResult {
+  const {
+    monthlyGallons, fuelType, currentFuelPrice, ticker, etfPrice,
+    hedgeRatio = 0.5, daysToExpiry = 45, impliedVol,
+  } = input;
+  const iv = impliedVol ?? getDefaultIV(ticker);
+  const putShortStrike = round2(etfPrice * 0.92);
+  const putLongStrike = round2(etfPrice * 0.85);
+  const callShortStrike = round2(etfPrice * 1.08);
+  const callLongStrike = round2(etfPrice * 1.15);
+  const contracts = notionalContractsForHedge(monthlyGallons, fuelType, currentFuelPrice, hedgeRatio, ticker, etfPrice);
+
+  const bsPutShort = pricesAt(etfPrice, putShortStrike, iv, daysToExpiry);
+  const bsPutLong = pricesAt(etfPrice, putLongStrike, iv, daysToExpiry);
+  const bsCallShort = pricesAt(etfPrice, callShortStrike, iv, daysToExpiry);
+  const bsCallLong = pricesAt(etfPrice, callLongStrike, iv, daysToExpiry);
+
+  const credit =
+    (bsPutShort.putPrice - bsPutLong.putPrice + bsCallShort.callPrice - bsCallLong.callPrice) *
+    100 * contracts;
+  const putWidth = (putShortStrike - putLongStrike) * 100 * contracts;
+  const callWidth = (callLongStrike - callShortStrike) * 100 * contracts;
+  const maxLoss = Math.max(putWidth, callWidth) - credit;
+
+  return {
+    strategy_key: "iron_condor",
+    display_name: "Iron Condor (Range-Bound Income)",
+    ticker,
+    expiry_days: daysToExpiry,
+    underlying_price: etfPrice,
+    contracts,
+    total_premium: -round2(credit),
+    total_premium_label: `$${Math.round(credit).toLocaleString()} net credit`,
+    max_loss: round2(maxLoss),
+    max_gain: round2(credit),
+    breakeven_etf_price: null,
+    net_delta: round4(
+      ((bsPutLong.putDelta - bsPutShort.putDelta) +
+        (-bsCallShort.callDelta + bsCallLong.callDelta)) *
+        contracts *
+        100
+    ),
+    hedge_fit: 0.45,
+    legs: [
+      {
+        side: "long", option_type: "put", strike: putLongStrike,
+        premium_per_share: round2(bsPutLong.putPrice), contracts,
+        delta: round4(bsPutLong.putDelta), gamma: round4(bsPutLong.gamma),
+        theta_per_day: round4(bsPutLong.putTheta), vega: round4(bsPutLong.vega), iv_used: iv,
+      },
+      {
+        side: "short", option_type: "put", strike: putShortStrike,
+        premium_per_share: round2(bsPutShort.putPrice), contracts,
+        delta: round4(-bsPutShort.putDelta), gamma: round4(-bsPutShort.gamma),
+        theta_per_day: round4(-bsPutShort.putTheta), vega: round4(-bsPutShort.vega), iv_used: iv,
+      },
+      {
+        side: "short", option_type: "call", strike: callShortStrike,
+        premium_per_share: round2(bsCallShort.callPrice), contracts,
+        delta: round4(-bsCallShort.callDelta), gamma: round4(-bsCallShort.gamma),
+        theta_per_day: round4(-bsCallShort.callTheta), vega: round4(-bsCallShort.vega), iv_used: iv,
+      },
+      {
+        side: "long", option_type: "call", strike: callLongStrike,
+        premium_per_share: round2(bsCallLong.callPrice), contracts,
+        delta: round4(bsCallLong.callDelta), gamma: round4(bsCallLong.gamma),
+        theta_per_day: round4(bsCallLong.callTheta), vega: round4(bsCallLong.vega), iv_used: iv,
+      },
+    ],
+    description: `Sell ${contracts} ${ticker} $${putShortStrike.toFixed(2)}/$${putLongStrike.toFixed(2)} put spread + sell ${contracts} $${callShortStrike.toFixed(2)}/$${callLongStrike.toFixed(2)} call spread (~${daysToExpiry} days). Collects $${Math.round(credit).toLocaleString()} credit. Profitable if ${ticker} stays between $${putShortStrike.toFixed(2)} and $${callShortStrike.toFixed(2)} at expiry.`,
+    best_for: "Income generation when an advisor has a defined-range view on fuel prices.",
+    rationale:
+      "An iron condor is a four-leg, defined-risk income trade. The advisor collects premium upfront, profits as long as the ETF stays in the middle, and has capped loss on either side. Best used when implied vol is rich and the advisor expects mean-reverting fuel prices.",
+  };
+}
+
 export function recommendEtfOptionsStrategies(
   monthlyGallons: number,
   fuelType: string,
@@ -977,10 +1103,13 @@ export function recommendEtfOptionsStrategies(
 
   return [
     calculateEtfLongCall({ ...baseInput, daysToExpiry: 120, strikeMoneyness: 1.0 }),
+    calculateEtfBullCallSpread({ ...baseInput, daysToExpiry: 120 }),
     calculateEtfCollar({ ...baseInput, daysToExpiry: 90 }),
     calculateEtfCoveredCall({ ...baseInput, daysToExpiry: 45, strikeMoneyness: 1.05 }),
     calculateEtfShortPut({ ...baseInput, daysToExpiry: 45, strikeMoneyness: 0.95 }),
+    calculateEtfBearPutSpread({ ...baseInput, daysToExpiry: 90 }),
     calculateEtfLongPut({ ...baseInput, daysToExpiry: 120, strikeMoneyness: 1.0 }),
+    calculateEtfIronCondor({ ...baseInput, daysToExpiry: 45 }),
   ];
 }
 
@@ -992,7 +1121,10 @@ export interface OptionPositionLiveValue {
   unrealized_pnl: number; // current_value - entry_cost, signed for long/short
   unrealized_pnl_pct: number;
   days_to_expiry: number;
-  delta: number;
+  delta: number;   // share-equivalent delta (contracts × 100 × per-share delta)
+  gamma: number;   // share-equivalent gamma per 1$ underlying move
+  theta: number;   // $/day decay across the position
+  vega: number;    // $/vol-point sensitivity
   intrinsic_value_per_share: number;
   time_value_per_share: number;
   iv_used: number;
@@ -1044,8 +1176,13 @@ export function valueOptionPosition(params: {
   const pnl = currentValue - entryCost;
   const pnlPct =
     Math.abs(entryCost) > 0 ? (pnl / Math.abs(entryCost)) * 100 : 0;
+  const positionUnits = 100 * contracts * sideMul;
   const delta =
-    option_type === "call" ? bs.callDelta * sideMul : bs.putDelta * sideMul;
+    (option_type === "call" ? bs.callDelta : bs.putDelta) * positionUnits;
+  const gamma = bs.gamma * positionUnits;
+  const theta =
+    (option_type === "call" ? bs.callTheta : bs.putTheta) * positionUnits;
+  const vega = bs.vega * positionUnits;
 
   return {
     current_underlying_price: round2(current_underlying_price),
@@ -1054,7 +1191,10 @@ export function valueOptionPosition(params: {
     unrealized_pnl: round2(pnl),
     unrealized_pnl_pct: round2(pnlPct),
     days_to_expiry: days,
-    delta: round4(delta * contracts * 100),
+    delta: round4(delta),
+    gamma: round4(gamma),
+    theta: round2(theta),
+    vega: round2(vega),
     intrinsic_value_per_share: round2(intrinsic),
     time_value_per_share: round2(timeValue),
     iv_used: ivUsed,
