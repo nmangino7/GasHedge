@@ -14,6 +14,7 @@ import StrategyCard from "@/components/StrategyCard";
 import ScenarioChart from "@/components/ScenarioChart";
 import ComplianceDisclaimer from "@/components/ComplianceDisclaimer";
 import ErrorAlert from "@/components/ErrorAlert";
+import OptionsChainPicker, { type PickedContract } from "@/components/OptionsChainPicker";
 import {
   FileText,
   MessageSquare,
@@ -555,6 +556,8 @@ function TrackOptionPositionModal({
   const [dealId, setDealId] = useState<number | null>(null);
   const [legIdx, setLegIdx] = useState(0);
   const [contracts, setContracts] = useState(strategy.contracts);
+  const [picked, setPicked] = useState<PickedContract | null>(null);
+  const [useLiveChain, setUseLiveChain] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -576,19 +579,22 @@ function TrackOptionPositionModal({
     setSubmitting(true);
     setErr(null);
     try {
+      const useLive = useLiveChain && picked !== null;
       await positionsApi.create({
         deal_id: dealId,
         strategy_key: strategy.strategy_key,
         ticker: strategy.ticker,
         option_type: leg.option_type,
         side: leg.side,
-        strike: leg.strike,
-        expiry: new Date(Date.now() + strategy.expiry_days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        strike: useLive ? picked!.strike : leg.strike,
+        expiry: useLive
+          ? picked!.expiry
+          : new Date(Date.now() + strategy.expiry_days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
         contracts,
-        entry_premium_per_share: leg.premium_per_share,
-        entry_underlying_price: strategy.underlying_price,
-        iv_used: leg.iv_used,
-        notes: `${strategy.display_name} · ${companyName}`,
+        entry_premium_per_share: useLive ? picked!.premium : leg.premium_per_share,
+        entry_underlying_price: useLive ? picked!.underlyingPrice : strategy.underlying_price,
+        iv_used: useLive ? picked!.impliedVolatility ?? leg.iv_used : leg.iv_used,
+        notes: `${strategy.display_name} · ${companyName}${useLive ? " · live chain fill" : ""}`,
       });
       onClose();
       window.location.href = "/tracker";
@@ -644,6 +650,38 @@ function TrackOptionPositionModal({
               </select>
             </div>
           )}
+          <div className="flex items-center gap-2 text-[11px]">
+            <label className="inline-flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useLiveChain}
+                onChange={(e) => setUseLiveChain(e.target.checked)}
+                className="accent-[color:var(--accent)]"
+              />
+              <span className="font-semibold text-[color:var(--ink-2)]">
+                Use live Yahoo chain (recommended)
+              </span>
+            </label>
+            <span className="text-[color:var(--muted-2)]">
+              · falls back to modeled premium if off
+            </span>
+          </div>
+          {useLiveChain ? (
+            <OptionsChainPicker
+              ticker={strategy.ticker}
+              optionType={leg.option_type}
+              preferredDays={strategy.expiry_days}
+              preferredStrike={leg.strike}
+              onPick={setPicked}
+            />
+          ) : (
+            <div className="surface p-3" style={{ background: "var(--bg)" }}>
+              <p className="text-[11px] text-[color:var(--muted)]">
+                Using modeled values: strike ${leg.strike.toFixed(2)} · premium ${leg.premium_per_share.toFixed(2)}/share ·
+                expires in {strategy.expiry_days}d
+              </p>
+            </div>
+          )}
           <div>
             <label className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">Contracts</label>
             <input
@@ -654,7 +692,7 @@ function TrackOptionPositionModal({
               onChange={(e) => setContracts(Number(e.target.value))}
             />
             <p className="text-[10px] text-[color:var(--muted-2)] mt-1">
-              Recommended: {strategy.contracts} · entry premium ${leg.premium_per_share.toFixed(2)}/share · underlying ${strategy.underlying_price.toFixed(2)}
+              Recommended: {strategy.contracts} contracts
             </p>
           </div>
           {err && <div className="pill pill-negative">{err}</div>}

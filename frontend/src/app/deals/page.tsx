@@ -34,9 +34,25 @@ const EMPTY_FORM: DealForm = {
   notes: "",
 };
 
+const STAGE_PILL: Record<string, string> = {
+  prospect: "pill-neutral",
+  proposed: "pill-teal",
+  signed: "pill-positive",
+  active: "pill-positive",
+  cancelled: "pill-negative",
+};
+
+const STAGE_TINT: Record<string, string> = {
+  prospect: "rgba(255,255,255,0.08)",
+  proposed: "rgba(13, 122, 114, 0.22)",
+  signed: "rgba(21, 163, 92, 0.22)",
+  active: "rgba(21, 163, 92, 0.32)",
+  cancelled: "rgba(192, 57, 43, 0.22)",
+};
+
 export default function DealsPage() {
   return (
-    <Suspense fallback={<div className="animate-pulse h-6 bg-gray-100 rounded w-48" />}>
+    <Suspense fallback={<div className="animate-pulse h-6 bg-[color:var(--bg-elev)] rounded w-48" />}>
       <DealsPageInner />
     </Suspense>
   );
@@ -61,7 +77,7 @@ function DealsPageInner() {
   const [postCreateCompanyId, setPostCreateCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   useEffect(() => {
@@ -75,19 +91,11 @@ function DealsPageInner() {
   async function loadData() {
     setLoading(true);
     try {
-      const [d, r, c] = await Promise.all([
-        dealsApi.list(),
-        dealsApi.revenue(),
-        companiesApi.list(),
-      ]);
+      const [d, r, c] = await Promise.all([dealsApi.list(), dealsApi.revenue(), companiesApi.list()]);
       setDeals(d);
       setRevenue(r);
       setCompanies(c);
-      setForm((prev) =>
-        prev.company_id === 0 && c.length > 0
-          ? { ...prev, company_id: c[0].id }
-          : prev
-      );
+      setForm((prev) => (prev.company_id === 0 && c.length > 0 ? { ...prev, company_id: c[0].id } : prev));
     } catch (e) {
       console.error("[Deals] loadData error:", e);
     }
@@ -163,18 +171,13 @@ function DealsPageInner() {
   }
 
   const filteredDeals = useMemo(
-    () =>
-      filter === "all"
-        ? deals
-        : deals.filter((d) => d.status === filter),
+    () => (filter === "all" ? deals : deals.filter((d) => d.status === filter)),
     [deals, filter]
   );
 
   const pipelineByStage = useMemo(() => {
     const map: Record<string, { count: number; revenue: number }> = {};
-    for (const stage of DEAL_STAGES) {
-      map[stage.value] = { count: 0, revenue: 0 };
-    }
+    for (const stage of DEAL_STAGES) map[stage.value] = { count: 0, revenue: 0 };
     for (const deal of deals) {
       if (!map[deal.status]) map[deal.status] = { count: 0, revenue: 0 };
       map[deal.status].count += 1;
@@ -183,34 +186,27 @@ function DealsPageInner() {
     return map;
   }, [deals]);
 
-  const stageColor = (status: string) =>
-    DEAL_STAGES.find((s) => s.value === status)?.color || "bg-gray-100 text-gray-700";
-
-  const stageLabel = (status: string) =>
-    DEAL_STAGES.find((s) => s.value === status)?.label || status;
-
-  const inputClass =
-    "w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 focus:ring-1 focus:ring-gray-400 outline-none";
-
+  const stageLabel = (status: string) => DEAL_STAGES.find((s) => s.value === status)?.label || status;
   const formValid = form.company_id > 0 && form.fee_amount > 0;
 
   if (loading) {
     return (
       <div className="animate-pulse space-y-3">
-        <div className="h-6 bg-gray-100 rounded w-48"></div>
-        <div className="h-20 bg-gray-100 rounded"></div>
-        <div className="h-32 bg-gray-100 rounded"></div>
+        <div className="h-9 bg-[color:var(--bg-elev)] rounded w-64" />
+        <div className="h-20 bg-[color:var(--bg-elev)] rounded" />
+        <div className="h-32 bg-[color:var(--bg-elev)] rounded" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Deals & Revenue</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Track every advisory engagement, your fee per client, and pipeline value
+          <span className="h-section">Pipeline & Revenue</span>
+          <h1 className="font-display text-3xl font-bold tracking-tight mt-1">Deals & Revenue</h1>
+          <p className="text-sm text-[color:var(--muted)] mt-1.5">
+            Every advisory engagement, fee structure, and pipeline value in one place.
           </p>
         </div>
         <button
@@ -218,49 +214,38 @@ function DealsPageInner() {
             setForm(EMPTY_FORM);
             setShowCreate(true);
           }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium"
+          className="btn btn-accent"
         >
           <PlusCircle className="h-4 w-4" /> New Deal
         </button>
       </div>
 
       {/* Pipeline strip */}
-      <div className="bg-slate-900 rounded-2xl p-4 mb-6 overflow-x-auto">
+      <div className="surface-deep p-5 mb-6 overflow-x-auto" style={{ borderRadius: "var(--radius-lg)" }}>
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pipeline</span>
-          <span className="text-[10px] text-slate-500">
-            {deals.length} deal{deals.length === 1 ? "" : "s"} · ${
-              deals.reduce((s, d) => s + d.annual_fee_revenue, 0).toLocaleString()
-            }/yr total
+          <span className="text-[10px] font-semibold text-white/45 uppercase tracking-wider">Pipeline</span>
+          <span className="text-[10px] text-white/45">
+            {deals.length} deal{deals.length === 1 ? "" : "s"} · $
+            {deals.reduce((s, d) => s + d.annual_fee_revenue, 0).toLocaleString()}/yr total
           </span>
         </div>
         <div className="flex gap-2 min-w-max">
           {DEAL_STAGES.map((stage) => {
             const data = pipelineByStage[stage.value] || { count: 0, revenue: 0 };
-            const stageBg: Record<string, string> = {
-              prospect: "bg-slate-700/40",
-              proposed: "bg-blue-600/30",
-              signed: "bg-emerald-600/30",
-              active: "bg-emerald-500/40",
-              cancelled: "bg-rose-600/30",
-            };
+            const isActive = filter === stage.value;
             return (
               <button
                 key={stage.value}
                 onClick={() => setFilter(stage.value)}
-                className={`flex-1 min-w-[120px] rounded-xl p-3 text-left transition-all ${
-                  filter === stage.value
-                    ? "ring-2 ring-white/40 " + (stageBg[stage.value] || "bg-slate-700/40")
-                    : (stageBg[stage.value] || "bg-slate-700/40") + " hover:ring-1 hover:ring-white/20"
-                }`}
+                className="flex-1 min-w-[130px] rounded-xl p-3 text-left transition-all"
+                style={{
+                  background: STAGE_TINT[stage.value] || "rgba(255,255,255,0.05)",
+                  boxShadow: isActive ? "inset 0 0 0 2px rgba(255,255,255,0.55)" : undefined,
+                }}
               >
-                <p className="text-[10px] uppercase tracking-wider text-white/70 font-semibold">{stage.label}</p>
-                <p className="text-xl font-bold text-white mt-0.5">
-                  ${Math.round(data.revenue / 1000)}k
-                </p>
-                <p className="text-[11px] text-white/70 mt-0.5">
-                  {data.count} deal{data.count === 1 ? "" : "s"}
-                </p>
+                <p className="text-[10px] uppercase tracking-wider text-white/65 font-semibold">{stage.label}</p>
+                <p className="text-num text-[22px] font-bold text-white mt-0.5">${Math.round(data.revenue / 1000)}k</p>
+                <p className="text-[11px] text-white/55 mt-0.5">{data.count} deal{data.count === 1 ? "" : "s"}</p>
               </button>
             );
           })}
@@ -271,11 +256,12 @@ function DealsPageInner() {
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <button
           onClick={() => setFilter("all")}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-            filter === "all"
-              ? "bg-gray-900 text-white border-gray-900"
-              : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-          }`}
+          className="text-[12px] font-semibold px-3 py-1.5 rounded-md transition-colors"
+          style={{
+            background: filter === "all" ? "var(--ink)" : "transparent",
+            color: filter === "all" ? "#fff" : "var(--ink-2)",
+            border: `1px solid ${filter === "all" ? "var(--ink)" : "var(--line)"}`,
+          }}
         >
           All ({deals.length})
         </button>
@@ -283,31 +269,32 @@ function DealsPageInner() {
           <button
             key={s.value}
             onClick={() => setFilter(s.value)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              filter === s.value
-                ? "bg-gray-900 text-white border-gray-900"
-                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-            }`}
+            className="text-[12px] font-semibold px-3 py-1.5 rounded-md transition-colors"
+            style={{
+              background: filter === s.value ? "var(--ink)" : "transparent",
+              color: filter === s.value ? "#fff" : "var(--ink-2)",
+              border: `1px solid ${filter === s.value ? "var(--ink)" : "var(--line)"}`,
+            }}
           >
             {s.label} ({pipelineByStage[s.value]?.count || 0})
           </button>
         ))}
       </div>
 
-      {/* Revenue summary */}
+      {/* Revenue KPIs */}
       {revenue && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Annual Advisor Revenue", value: `$${revenue.total_annual_revenue.toLocaleString()}`, icon: DollarSign },
-            { label: "Monthly Run Rate", value: `$${revenue.total_monthly_revenue.toLocaleString()}`, icon: DollarSign },
-            { label: "Active Deals", value: revenue.active_deals.toString(), icon: Users },
-            { label: "Pipeline Value", value: `$${revenue.pipeline_value.toLocaleString()}`, icon: TrendingUp },
+            { label: "Annual Advisor Revenue", value: `$${revenue.total_annual_revenue.toLocaleString()}`, icon: DollarSign, accent: "accent" as const },
+            { label: "Monthly Run Rate", value: `$${revenue.total_monthly_revenue.toLocaleString()}`, icon: DollarSign, accent: "teal" as const },
+            { label: "Active Deals", value: revenue.active_deals.toString(), icon: Users, accent: "positive" as const },
+            { label: "Pipeline Value", value: `$${revenue.pipeline_value.toLocaleString()}`, icon: TrendingUp, accent: "ink" as const },
           ].map((card) => (
-            <div key={card.label} className="bg-white rounded-lg border border-gray-200 p-4">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                <card.icon className="h-3.5 w-3.5" /> {card.label}
+            <div key={card.label} className={`kpi kpi-${card.accent}`}>
+              <div className="kpi-label flex items-center gap-1.5">
+                <card.icon className="h-3 w-3" /> {card.label}
               </div>
-              <p className="text-xl font-semibold text-gray-900">{card.value}</p>
+              <div className="kpi-value">{card.value}</div>
             </div>
           ))}
         </div>
@@ -315,31 +302,29 @@ function DealsPageInner() {
 
       {/* Top clients */}
       {revenue && revenue.top_clients.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Top Clients by Advisor Revenue</h2>
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-sm">
+        <div className="surface mb-6" style={{ padding: 0, overflow: "hidden" }}>
+          <h2 className="h-section px-5 pt-5 pb-3">Top Clients by Advisor Revenue</h2>
+          <div className="overflow-x-auto">
+            <table className="tbl">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">Company</th>
-                  <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium">Annual Revenue</th>
-                  <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium">Deals</th>
-                  <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium">3-Year Value</th>
+                <tr>
+                  <th>Company</th>
+                  <th className="right">Annual Revenue</th>
+                  <th className="right">Deals</th>
+                  <th className="right">3-Year Value</th>
                 </tr>
               </thead>
               <tbody>
                 {revenue.top_clients.map((c) => (
-                  <tr key={c.company_id} className="border-b border-gray-50">
-                    <td className="py-2 px-3 text-gray-900 font-medium">
-                      <Link href={`/companies/${c.company_id}`} className="hover:text-indigo-600">
+                  <tr key={c.company_id}>
+                    <td>
+                      <Link href={`/companies/${c.company_id}`} className="hover:text-[color:var(--accent)] font-semibold">
                         {c.company_name}
                       </Link>
                     </td>
-                    <td className="py-2 px-3 text-right text-gray-700">
-                      ${c.annual_revenue.toLocaleString()}
-                    </td>
-                    <td className="py-2 px-3 text-right text-gray-700">{c.deal_count}</td>
-                    <td className="py-2 px-3 text-right text-emerald-700 font-medium">
+                    <td className="right num">${c.annual_revenue.toLocaleString()}</td>
+                    <td className="right num">{c.deal_count}</td>
+                    <td className="right num font-semibold" style={{ color: "var(--positive)" }}>
                       ${(c.annual_revenue * 3).toLocaleString()}
                     </td>
                   </tr>
@@ -351,64 +336,57 @@ function DealsPageInner() {
       )}
 
       {/* Deals table */}
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+      <div className="surface" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h2 className="h-section">
             {filter === "all" ? "All Deals" : stageLabel(filter) + " Deals"}
           </h2>
-          <span className="text-xs text-gray-400">{filteredDeals.length} shown</span>
+          <span className="text-[11px] text-[color:var(--muted-2)]">{filteredDeals.length} shown</span>
         </div>
 
         {filteredDeals.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-12">
-            {filter === "all"
-              ? "No deals yet. Create one to start tracking revenue."
-              : `No ${stageLabel(filter).toLowerCase()} deals.`}
+          <p className="text-sm text-[color:var(--muted-2)] text-center py-12">
+            {filter === "all" ? "No deals yet. Create one to start tracking revenue." : `No ${stageLabel(filter).toLowerCase()} deals.`}
           </p>
         ) : (
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-sm min-w-[800px]">
+          <div className="overflow-x-auto">
+            <table className="tbl" style={{ minWidth: 800 }}>
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">Company</th>
-                  <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">Fee Type</th>
-                  <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium">Fee</th>
-                  <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium bg-emerald-50">Your Annual Comp</th>
-                  <th className="text-center py-2 px-3 text-xs text-gray-500 font-medium">Status</th>
-                  <th className="text-right py-2 px-3 text-xs text-gray-500 font-medium">Actions</th>
+                <tr>
+                  <th>Company</th>
+                  <th>Fee Type</th>
+                  <th className="right">Fee</th>
+                  <th className="right" style={{ background: "var(--positive-tint)" }}>Annual Comp</th>
+                  <th>Status</th>
+                  <th className="right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredDeals.map((d) => (
-                  <tr key={d.id} className="border-b border-gray-50 hover:bg-gray-50/60">
-                    <td className="py-2.5 px-3">
+                  <tr key={d.id}>
+                    <td>
                       <Link
                         href={`/companies/${d.company_id}`}
-                        className="text-gray-900 font-medium hover:text-indigo-600 inline-flex items-center gap-1"
+                        className="font-semibold text-[color:var(--ink)] hover:text-[color:var(--accent)] inline-flex items-center gap-1"
                       >
-                        <Building2 className="h-3 w-3 text-gray-400" />
+                        <Building2 className="h-3 w-3 text-[color:var(--muted-2)]" />
                         {d.company_name || `Company #${d.company_id}`}
                       </Link>
-                      {d.notes && (
-                        <p className="text-[11px] text-gray-400 mt-0.5 max-w-xs truncate">{d.notes}</p>
-                      )}
+                      {d.notes && <p className="text-[11px] text-[color:var(--muted-2)] mt-0.5 max-w-xs truncate">{d.notes}</p>}
                     </td>
-                    <td className="py-2.5 px-3 text-gray-700 capitalize">
-                      {d.fee_structure.replace("_", " ")}
+                    <td className="capitalize">{d.fee_structure.replace("_", " ")}</td>
+                    <td className="right num">
+                      {d.fee_structure === "aum_percentage" ? `${d.fee_amount}%` : `$${d.fee_amount.toLocaleString()}`}
                     </td>
-                    <td className="py-2.5 px-3 text-right text-gray-700">
-                      {d.fee_structure === "aum_percentage"
-                        ? `${d.fee_amount}%`
-                        : `$${d.fee_amount.toLocaleString()}`}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-semibold bg-emerald-50/40">
+                    <td className="right num font-semibold" style={{ background: "var(--positive-tint)", color: "var(--positive)" }}>
                       ${d.annual_fee_revenue.toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-center">
+                    <td>
                       <select
                         value={d.status}
                         onChange={(e) => updateDealStatus(d.id, e.target.value)}
-                        className={`text-[11px] font-medium rounded-full px-2 py-0.5 border-0 ${stageColor(d.status)}`}
+                        className={`pill ${STAGE_PILL[d.status] || "pill-neutral"} text-[11px] py-0 cursor-pointer`}
+                        style={{ borderWidth: 0 }}
                       >
                         {DEAL_STAGES.map((s) => (
                           <option key={s.value} value={s.value}>
@@ -417,26 +395,27 @@ function DealsPageInner() {
                         ))}
                       </select>
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td className="right">
                       <div className="inline-flex items-center gap-1">
                         <Link
                           href={`/implementation/${d.company_id}?deal_id=${d.id}`}
                           title="Build / view hedging plan"
-                          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-indigo-600"
+                          className="p-1.5 rounded text-[color:var(--muted)] hover:bg-[color:var(--bg)] hover:text-[color:var(--accent)]"
                         >
                           <FileText className="h-3.5 w-3.5" />
                         </Link>
                         <button
                           onClick={() => openEdit(d)}
                           title="Edit deal"
-                          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-900"
+                          className="p-1.5 rounded text-[color:var(--muted)] hover:bg-[color:var(--bg)] hover:text-[color:var(--ink)]"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => setConfirmDelete(d)}
                           title="Delete deal"
-                          className="p-1.5 rounded hover:bg-red-50 text-gray-500 hover:text-red-600"
+                          className="p-1.5 rounded text-[color:var(--muted)] hover:text-[color:var(--negative)]"
+                          style={{ "--hover-bg": "var(--negative-tint)" } as React.CSSProperties}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -453,18 +432,16 @@ function DealsPageInner() {
       {/* Create / Edit modal */}
       {(showCreate || editingDeal) && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          style={{ background: "rgba(11,18,32,0.55)" }}
           onClick={() => {
             setShowCreate(false);
             setEditingDeal(null);
           }}
         >
-          <div
-            className="bg-white rounded-xl p-6 w-full max-w-md border border-gray-200 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="surface w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-900">
+              <h3 className="font-display text-[18px] font-bold tracking-tight">
                 {editingDeal ? "Edit Deal" : "Create New Deal"}
               </h3>
               <button
@@ -472,95 +449,80 @@ function DealsPageInner() {
                   setShowCreate(false);
                   setEditingDeal(null);
                 }}
-                className="p-1 rounded hover:bg-gray-100 text-gray-500"
+                className="p-1 rounded hover:bg-[color:var(--bg)] text-[color:var(--muted)]"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Company</label>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">Company</span>
                 <select
                   value={form.company_id}
-                  onChange={(e) =>
-                    setForm({ ...form, company_id: parseInt(e.target.value) })
-                  }
-                  className={inputClass}
+                  onChange={(e) => setForm({ ...form, company_id: parseInt(e.target.value) })}
+                  className="select"
                 >
                   {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Fee Structure</label>
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">Fee Structure</span>
                 <select
                   value={form.fee_structure}
                   onChange={(e) => setForm({ ...form, fee_structure: e.target.value })}
-                  className={inputClass}
+                  className="select"
                 >
                   {FEE_STRUCTURES.map((f) => (
-                    <option key={f.value} value={f.value}>
-                      {f.label}
-                    </option>
+                    <option key={f.value} value={f.value}>{f.label}</option>
                   ))}
                 </select>
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-[11px] text-[color:var(--muted-2)] mt-1">
                   {FEE_STRUCTURES.find((f) => f.value === form.fee_structure)?.description}
                 </p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  {form.fee_structure === "aum_percentage"
-                    ? "Fee %"
-                    : form.fee_structure === "subscription"
-                    ? "Monthly Amount ($)"
-                    : "Flat Fee ($)"}
-                </label>
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">
+                  {form.fee_structure === "aum_percentage" ? "Fee %" : form.fee_structure === "subscription" ? "Monthly Amount ($)" : "Flat Fee ($)"}
+                </span>
                 <input
                   type="number"
                   value={form.fee_amount}
                   step={form.fee_structure === "aum_percentage" ? 0.1 : 100}
-                  onChange={(e) =>
-                    setForm({ ...form, fee_amount: parseFloat(e.target.value) || 0 })
-                  }
-                  className={inputClass}
+                  onChange={(e) => setForm({ ...form, fee_amount: parseFloat(e.target.value) || 0 })}
+                  className="input"
                 />
-              </div>
+              </label>
               {form.fee_structure === "aum_percentage" && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">AUM Value ($)</label>
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">AUM Value ($)</span>
                   <input
                     type="number"
                     value={form.aum_value}
-                    onChange={(e) =>
-                      setForm({ ...form, aum_value: parseFloat(e.target.value) || 0 })
-                    }
-                    className={inputClass}
+                    onChange={(e) => setForm({ ...form, aum_value: parseFloat(e.target.value) || 0 })}
+                    className="input"
                   />
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    Estimated annual fee: $
-                    {Math.round(form.aum_value * (form.fee_amount / 100)).toLocaleString()}
+                  <p className="text-[11px] text-[color:var(--muted-2)] mt-1">
+                    Estimated annual fee: ${Math.round(form.aum_value * (form.fee_amount / 100)).toLocaleString()}
                   </p>
-                </div>
+                </label>
               )}
               {form.fee_structure === "subscription" && (
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-[color:var(--muted-2)]">
                   Annual revenue from this deal: ${(form.fee_amount * 12).toLocaleString()}
                 </p>
               )}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">Notes</span>
                 <textarea
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  className={`${inputClass} resize-none`}
+                  className="textarea resize-none"
                   rows={2}
                   placeholder="e.g. 50% hedge on diesel via USO"
                 />
-              </div>
+              </label>
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button
@@ -568,15 +530,11 @@ function DealsPageInner() {
                   setShowCreate(false);
                   setEditingDeal(null);
                 }}
-                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="btn btn-ghost"
               >
                 Cancel
               </button>
-              <button
-                onClick={editingDeal ? saveEdit : createDeal}
-                disabled={!formValid || saving}
-                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <button onClick={editingDeal ? saveEdit : createDeal} disabled={!formValid || saving} className="btn btn-accent">
                 {saving ? "Saving..." : editingDeal ? "Save Changes" : "Create Deal"}
               </button>
             </div>
@@ -586,11 +544,14 @@ function DealsPageInner() {
 
       {/* Post-create CTA */}
       {postCreateDealId && postCreateCompanyId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-sm border border-gray-200 shadow-xl">
-            <h3 className="text-base font-semibold text-gray-900 mb-1">Deal created</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Want to build the hedging implementation plan now? It only takes 2 minutes.
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          style={{ background: "rgba(11,18,32,0.55)" }}
+        >
+          <div className="surface w-full max-w-sm p-6">
+            <h3 className="font-display text-[17px] font-bold tracking-tight mb-1">Deal Created</h3>
+            <p className="text-[13px] text-[color:var(--ink-2)] mb-4 leading-relaxed">
+              Build the hedging implementation plan now? Takes 2 minutes.
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -598,15 +559,13 @@ function DealsPageInner() {
                   setPostCreateDealId(null);
                   setPostCreateCompanyId(null);
                 }}
-                className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="btn btn-ghost btn-sm"
               >
                 Later
               </button>
               <button
-                onClick={() => {
-                  router.push(`/implementation/${postCreateCompanyId}?deal_id=${postCreateDealId}`);
-                }}
-                className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium inline-flex items-center gap-1.5"
+                onClick={() => router.push(`/implementation/${postCreateCompanyId}?deal_id=${postCreateDealId}`)}
+                className="btn btn-accent btn-sm"
               >
                 Build plan now <ArrowRight className="h-3.5 w-3.5" />
               </button>
@@ -618,32 +577,25 @@ function DealsPageInner() {
       {/* Delete confirm */}
       {confirmDelete && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          style={{ background: "rgba(11,18,32,0.55)" }}
           onClick={() => setConfirmDelete(null)}
         >
-          <div
-            className="bg-white rounded-xl p-6 w-full max-w-sm border border-gray-200 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-semibold text-gray-900 mb-2">Delete this deal?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              {confirmDelete.company_name} —{" "}
-              <span className="capitalize">{confirmDelete.fee_structure.replace("_", " ")}</span> · $
+          <div className="surface w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-[17px] font-bold tracking-tight mb-2">Delete this deal?</h3>
+            <p className="text-[13px] text-[color:var(--ink-2)] mb-4 leading-relaxed">
+              <strong>{confirmDelete.company_name}</strong> — <span className="capitalize">{confirmDelete.fee_structure.replace("_", " ")}</span> · $
               {confirmDelete.annual_fee_revenue.toLocaleString()}/yr.
               <br />
               This cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setConfirmDelete(null)} className="btn btn-ghost btn-sm">Cancel</button>
               <button
                 onClick={deleteDeal}
                 disabled={saving}
-                className="px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 font-medium disabled:opacity-50"
+                className="btn btn-sm"
+                style={{ background: "var(--negative)", color: "#fff", borderColor: "var(--negative)" }}
               >
                 {saving ? "Deleting..." : "Delete deal"}
               </button>

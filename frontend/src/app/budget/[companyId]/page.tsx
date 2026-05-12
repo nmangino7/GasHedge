@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Shield,
   Loader2,
+  ArrowRight,
 } from "lucide-react";
 import ErrorAlert from "@/components/ErrorAlert";
 
@@ -67,7 +68,7 @@ export default function BudgetPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchBudget();
+      void fetchBudget();
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,18 +79,14 @@ export default function BudgetPage() {
       setLoading(true);
       setError(null);
       const budgetParam = budget ? `&budget=${budget}` : "";
-      const res = await fetch(
-        `/api/budget/${companyId}?hedge_ratio=${hedgeRatio}${budgetParam}`
-      );
+      const res = await fetch(`/api/budget/${companyId}?hedge_ratio=${hedgeRatio}${budgetParam}`);
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to fetch budget data");
       }
       const json = await res.json();
       setData(json);
-      if (!budget && json.annual_budget) {
-        setBudget(String(json.annual_budget));
-      }
+      if (!budget && json.annual_budget) setBudget(String(json.annual_budget));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -98,101 +95,84 @@ export default function BudgetPage() {
   }
 
   const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(value);
-
-  const statusColors = {
-    healthy: {
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
-      border: "border-emerald-200",
-      badge: "bg-emerald-100 text-emerald-800",
-      label: "Healthy",
-    },
-    warning: {
-      bg: "bg-amber-50",
-      text: "text-amber-700",
-      border: "border-amber-200",
-      badge: "bg-amber-100 text-amber-800",
-      label: "Warning",
-    },
-    over: {
-      bg: "bg-rose-50",
-      text: "text-rose-700",
-      border: "border-rose-200",
-      badge: "bg-rose-100 text-rose-800",
-      label: "Over Budget",
-    },
-  };
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <ErrorAlert
-          title="Budget Calculation Error"
-          message={error}
-          suggestion="Please check the company ID and try again."
-          onRetry={fetchBudget}
-        />
-      </div>
+      <ErrorAlert
+        title="Budget Calculation Error"
+        message={error}
+        suggestion="Please check the company ID and try again."
+        onRetry={fetchBudget}
+      />
     );
   }
 
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-[color:var(--muted-2)]" />
       </div>
     );
   }
 
   if (!data) return null;
 
-  const status = statusColors[data.budget_status];
+  const statusPill =
+    data.budget_status === "healthy"
+      ? "pill-positive"
+      : data.budget_status === "warning"
+      ? "pill-warning"
+      : "pill-negative";
+  const statusLabel =
+    data.budget_status === "healthy" ? "Healthy" : data.budget_status === "warning" ? "Warning" : "Over Budget";
+  const statusTint =
+    data.budget_status === "healthy" ? "var(--positive-tint)" : data.budget_status === "warning" ? "var(--warning-tint)" : "var(--negative-tint)";
+  const statusColor =
+    data.budget_status === "healthy" ? "var(--positive)" : data.budget_status === "warning" ? "var(--warning)" : "var(--negative)";
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-blue-50 rounded-lg">
-          <Calculator className="h-6 w-6 text-blue-600" />
+      <div className="flex items-start gap-3">
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+          style={{ background: "var(--accent-tint)", color: "var(--accent-lo)" }}
+        >
+          <Calculator className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Fuel Budget Calculator
-          </h1>
-          <p className="text-sm text-slate-500">{data.company_name}</p>
+          <span className="h-section">Fuel Budget Modeler</span>
+          <h1 className="font-display text-3xl font-bold tracking-tight">{data.company_name}</h1>
+          <p className="text-sm text-[color:var(--muted)] mt-1">
+            Budget vs. projected spend · burn-down · hedge impact comparison
+          </p>
         </div>
-        {loading && (
-          <Loader2 className="h-4 w-4 animate-spin text-slate-400 ml-2" />
-        )}
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-[color:var(--muted-2)] ml-2" />}
       </div>
 
       {/* Controls */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <div className="surface p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Annual Fuel Budget ($)
-            </label>
+          <label className="block">
+            <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">
+              Annual Fuel Budget
+            </span>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[color:var(--muted-2)]" />
               <input
                 type="number"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
                 placeholder="Enter annual budget"
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="input pl-9"
               />
             </div>
-          </div>
+          </label>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <span className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider block mb-1.5">
               Hedge Ratio
-            </label>
+            </span>
             <div className="flex gap-2">
               {[
                 { label: "25%", value: 0.25 },
@@ -202,11 +182,12 @@ export default function BudgetPage() {
                 <button
                   key={opt.value}
                   onClick={() => setHedgeRatio(opt.value)}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                    hedgeRatio === opt.value
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className="flex-1 py-2 px-3 rounded-lg text-[13px] font-semibold transition-colors"
+                  style={{
+                    background: hedgeRatio === opt.value ? "var(--ink)" : "transparent",
+                    color: hedgeRatio === opt.value ? "#fff" : "var(--ink-2)",
+                    border: `1px solid ${hedgeRatio === opt.value ? "var(--ink)" : "var(--line)"}`,
+                  }}
                 >
                   {opt.label}
                 </button>
@@ -216,168 +197,91 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="h-4 w-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-              Annual Budget
-            </span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {formatCurrency(data.annual_budget)}
-          </p>
+        <div className="kpi kpi-accent">
+          <div className="kpi-label flex items-center gap-1.5"><DollarSign className="h-3 w-3" /> Annual Budget</div>
+          <div className="kpi-value">{formatCurrency(data.annual_budget)}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="h-4 w-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-              Current Annual Cost
-            </span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {formatCurrency(data.annual_base_cost)}
-          </p>
+        <div className="kpi kpi-ink">
+          <div className="kpi-label flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> Projected Cost</div>
+          <div className="kpi-value">{formatCurrency(data.annual_base_cost)}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Calculator className="h-4 w-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-              Budget Utilization
-            </span>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {data.budget_utilization_pct}%
-          </p>
+        <div className="kpi kpi-teal">
+          <div className="kpi-label flex items-center gap-1.5"><Calculator className="h-3 w-3" /> Utilization</div>
+          <div className="kpi-value">{data.budget_utilization_pct}%</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="h-4 w-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-              Status
+        <div className="kpi" style={{ borderTop: `3px solid ${statusColor}` }}>
+          <div className="kpi-label flex items-center gap-1.5"><Shield className="h-3 w-3" /> Status</div>
+          <div className="mt-1">
+            <span className={`pill ${statusPill}`} style={{ padding: "5px 12px", fontSize: "12px" }}>
+              {statusLabel}
             </span>
           </div>
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${status.badge}`}
-          >
-            {status.label}
-          </span>
         </div>
       </div>
 
-      {/* Burn-Down Chart */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">
-          Budget Burn-Down
-        </h2>
+      {/* Chart */}
+      <div className="surface p-5">
+        <h2 className="h-section mb-3">Budget Burn-Down</h2>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data.burn_down}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12, fill: "#64748b" }}
-              />
-              <YAxis
-                tick={{ fontSize: 12, fill: "#64748b" }}
-                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
-              />
+              <defs>
+                <linearGradient id="remainingGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#d4762a" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#d4762a" stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted)" }} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--muted)" }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 formatter={(value: unknown) => [formatCurrency(Number(value))]}
                 labelFormatter={(label: unknown) => `Month: ${label}`}
                 contentStyle={{
                   borderRadius: "8px",
-                  border: "1px solid #e2e8f0",
-                  fontSize: "13px",
+                  border: "1px solid var(--line)",
+                  fontSize: "12px",
+                  background: "var(--bg-elev)",
                 }}
               />
-              <ReferenceLine
-                y={0}
-                stroke="#ef4444"
-                strokeDasharray="4 4"
-                label={{ value: "Budget Exhausted", fill: "#ef4444", fontSize: 11 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="remaining"
-                name="Remaining Budget"
-                stroke="#3b82f6"
-                fill="#dbeafe"
-                strokeWidth={2}
-              />
+              <ReferenceLine y={0} stroke="var(--negative)" strokeDasharray="4 4" label={{ value: "Exhausted", fill: "var(--negative)", fontSize: 11 }} />
+              <Area type="monotone" dataKey="remaining" name="Remaining Budget" stroke="#d4762a" fill="url(#remainingGrad)" strokeWidth={2.5} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Scenario Comparison Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">
-          Scenario Comparison
-        </h2>
+      {/* Scenarios */}
+      <div className="surface" style={{ padding: 0, overflow: "hidden" }}>
+        <h2 className="h-section px-5 pt-5 pb-3">Scenario Comparison</h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="tbl">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-3 px-3 font-medium text-slate-500">
-                  Price Change
-                </th>
-                <th className="text-right py-3 px-3 font-medium text-slate-500">
-                  New $/gal
-                </th>
-                <th className="text-right py-3 px-3 font-medium text-slate-500">
-                  Annual Cost
-                </th>
-                <th className="text-right py-3 px-3 font-medium text-slate-500">
-                  Over/Under Budget
-                </th>
-                <th className="text-right py-3 px-3 font-medium text-slate-500">
-                  With Hedge
-                </th>
-                <th className="text-right py-3 px-3 font-medium text-slate-500">
-                  Hedge Savings
-                </th>
+              <tr>
+                <th>Price Change</th>
+                <th className="right">New $/gal</th>
+                <th className="right">Annual Cost</th>
+                <th className="right">Over/Under Budget</th>
+                <th className="right">With Hedge</th>
+                <th className="right">Hedge Savings</th>
               </tr>
             </thead>
             <tbody>
               {data.scenarios.map((s) => {
                 const isOver = s.over_budget > 0;
-                const isHedgedOver = s.hedged_over_budget > 0;
                 return (
-                  <tr
-                    key={s.price_change_pct}
-                    className="border-b border-slate-100 hover:bg-slate-50"
-                  >
-                    <td className="py-3 px-3 font-medium">
-                      {s.price_change_pct > 0 ? "+" : ""}
-                      {(s.price_change_pct * 100).toFixed(0)}%
+                  <tr key={s.price_change_pct}>
+                    <td className="num font-semibold">{s.price_change_pct > 0 ? "+" : ""}{(s.price_change_pct * 100).toFixed(0)}%</td>
+                    <td className="right num">${s.new_price.toFixed(3)}</td>
+                    <td className="right num">{formatCurrency(s.annual_cost)}</td>
+                    <td className="right num font-semibold" style={{ color: isOver ? "var(--negative)" : "var(--positive)" }}>
+                      {isOver ? "+" : ""}{formatCurrency(s.over_budget)}
                     </td>
-                    <td className="py-3 px-3 text-right">
-                      ${s.new_price.toFixed(3)}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      {formatCurrency(s.annual_cost)}
-                    </td>
-                    <td
-                      className={`py-3 px-3 text-right font-medium ${
-                        isOver ? "text-rose-600" : "text-emerald-600"
-                      }`}
-                    >
-                      {isOver ? "+" : ""}
-                      {formatCurrency(s.over_budget)}
-                    </td>
-                    <td
-                      className={`py-3 px-3 text-right font-medium ${
-                        isHedgedOver ? "text-rose-600" : "text-emerald-600"
-                      }`}
-                    >
-                      {formatCurrency(s.hedged_annual_cost)}
-                    </td>
-                    <td className="py-3 px-3 text-right text-emerald-600 font-medium">
-                      {s.hedge_savings > 0
-                        ? formatCurrency(s.hedge_savings)
-                        : "-"}
+                    <td className="right num">{formatCurrency(s.hedged_annual_cost)}</td>
+                    <td className="right num font-semibold" style={{ color: "var(--positive)" }}>
+                      {s.hedge_savings > 0 ? formatCurrency(s.hedge_savings) : "—"}
                     </td>
                   </tr>
                 );
@@ -387,28 +291,24 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* Budget Alerts */}
+      {/* Alert */}
       {data.budget_status !== "healthy" && (
-        <div
-          className={`rounded-xl border p-5 ${status.bg} ${status.border}`}
-        >
+        <div className="surface p-5" style={{ background: statusTint, borderColor: statusTint }}>
           <div className="flex items-start gap-3">
-            <AlertTriangle className={`h-5 w-5 mt-0.5 ${status.text}`} />
+            <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" style={{ color: statusColor }} />
             <div>
-              <h3 className={`font-semibold ${status.text}`}>
-                {data.budget_status === "warning"
-                  ? "Budget Warning"
-                  : "Over Budget Alert"}
+              <h3 className="font-semibold text-[14px]" style={{ color: statusColor }}>
+                {data.budget_status === "warning" ? "Budget Warning" : "Over Budget Alert"}
               </h3>
-              <p className={`text-sm mt-1 ${status.text}`}>
+              <p className="text-[13px] mt-1 text-[color:var(--ink-2)] leading-relaxed">
                 {data.budget_status === "warning"
-                  ? `Your fuel budget utilization is at ${data.budget_utilization_pct}%. At current prices, you are approaching your annual budget limit. Consider hedging to lock in current prices and protect against further increases.`
-                  : `Your projected fuel costs exceed your annual budget by ${formatCurrency(data.annual_base_cost - data.annual_budget)}. Immediate action is recommended to either increase your budget or implement a hedging strategy to reduce cost exposure.`}
+                  ? `Fuel budget utilization is at ${data.budget_utilization_pct}%. At current prices, the client is approaching the annual budget limit. Hedging would lock in current prices and protect against further increases.`
+                  : `Projected fuel costs exceed the annual budget by ${formatCurrency(data.annual_base_cost - data.annual_budget)}. Immediate action recommended — either increase the budget or implement a hedge to cap exposure.`}
               </p>
-              <p className={`text-xs mt-2 ${status.text} opacity-80`}>
+              <p className="text-[11px] mt-2 text-[color:var(--muted)] italic">
                 {data.budget_status === "warning"
-                  ? "Recommendation: Hedge 50-75% of remaining fuel needs to cap downside risk."
-                  : "Recommendation: Hedge immediately at maximum ratio to limit further budget overrun."}
+                  ? "Recommendation: hedge 50–75% of remaining fuel needs to cap downside."
+                  : "Recommendation: hedge immediately at maximum ratio to limit further overrun."}
               </p>
             </div>
           </div>
@@ -416,21 +316,15 @@ export default function BudgetPage() {
       )}
 
       {/* CTA */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
-        <Shield className="h-10 w-10 text-blue-600 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-slate-900 mb-1">
-          Protect Your Budget
-        </h3>
-        <p className="text-sm text-slate-500 mb-4 max-w-md mx-auto">
-          Lock in current fuel prices with a hedging strategy tailored to your
-          consumption and budget.
+      <div className="surface-deep p-7 text-center" style={{ borderRadius: "var(--radius-lg)" }}>
+        <Shield className="h-9 w-9 mx-auto mb-3 text-[#e8893f]" />
+        <h3 className="font-display text-[18px] font-bold text-white mb-1">Protect This Budget</h3>
+        <p className="text-[13px] text-white/65 mb-4 max-w-md mx-auto">
+          Lock in current fuel prices with a hedging strategy sized to this client&apos;s consumption and budget.
         </p>
-        <a
-          href={`/hedging/${companyId}`}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Shield className="h-4 w-4" />
+        <a href={`/hedging/${companyId}`} className="btn btn-accent inline-flex">
           Start Hedging
+          <ArrowRight className="h-4 w-4" />
         </a>
       </div>
     </div>

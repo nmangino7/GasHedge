@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { positionsApi, dealsApi, companiesApi } from "@/lib/api";
 import type { LiveTrackerResponse, LivePositionRow } from "@/lib/api";
+import OptionsChainPicker, { type PickedContract } from "@/components/OptionsChainPicker";
 
 type FilterTicker = string | "ALL";
 
@@ -526,25 +527,23 @@ function AddPositionModal({
               <option value="short">Short (Seller)</option>
             </select>
           </Field>
-          <Field label="Strike">
-            <input
-              className="input"
-              type="number"
-              step="0.5"
-              value={form.strike}
-              onChange={(e) => setForm({ ...form, strike: Number(e.target.value) })}
-              required
+          <div className="col-span-2">
+            <OptionsChainPicker
+              ticker={form.ticker}
+              optionType={form.option_type}
+              preferredDays={90}
+              onPick={(c) => {
+                if (!c) return;
+                setForm((f) => ({
+                  ...f,
+                  strike: c.strike,
+                  expiry: c.expiry,
+                  entry_premium_per_share: c.premium || f.entry_premium_per_share,
+                  entry_underlying_price: c.underlyingPrice || f.entry_underlying_price,
+                }));
+              }}
             />
-          </Field>
-          <Field label="Expiry">
-            <input
-              className="input"
-              type="date"
-              value={form.expiry}
-              onChange={(e) => setForm({ ...form, expiry: e.target.value })}
-              required
-            />
-          </Field>
+          </div>
           <Field label="Contracts">
             <input
               className="input"
@@ -555,23 +554,13 @@ function AddPositionModal({
               required
             />
           </Field>
-          <Field label="Entry Premium / share">
+          <Field label="Entry Premium / share (override)">
             <input
               className="input"
               type="number"
               step="0.01"
               value={form.entry_premium_per_share}
               onChange={(e) => setForm({ ...form, entry_premium_per_share: Number(e.target.value) })}
-              required
-            />
-          </Field>
-          <Field label="Entry Underlying Price">
-            <input
-              className="input"
-              type="number"
-              step="0.01"
-              value={form.entry_underlying_price}
-              onChange={(e) => setForm({ ...form, entry_underlying_price: Number(e.target.value) })}
               required
             />
           </Field>
