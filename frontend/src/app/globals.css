@@ -96,7 +96,8 @@ html, body {
   border-color: var(--line-strong);
 }
 .surface-deep {
-  background: linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-deep-2) 100%);
+  background-color: var(--bg-deep);
+  background-image: linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-deep-2) 100%);
   border-radius: var(--radius);
   color: #f6f7fa;
 }
@@ -251,13 +252,21 @@ html, body {
 @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .animate-in { animation: fade-in 0.35s ease-out backwards; }
 
-/* Subtle background pattern for hero areas */
-.bg-grid {
+/* Subtle background pattern for hero areas — additive: layered ON TOP of any existing
+   surface background (uses ::before so it doesn't clobber background-image). */
+.bg-grid { position: relative; }
+.bg-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   background-image:
-    linear-gradient(rgba(11, 18, 32, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 18, 32, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 32px 32px;
+  border-radius: inherit;
 }
+.bg-grid > * { position: relative; z-index: 1; }
 
 /* Strategy card emphasized look */
 .strategy-card {
