@@ -1,5 +1,5 @@
 import { sql as vercelSql, type VercelPoolClient } from "@vercel/postgres";
-import { SEED_COMPANIES, SEED_DEALS } from "./seed";
+import { SEED_COMPANIES, SEED_DEALS, SEED_OPTION_POSITIONS } from "./seed";
 
 export function isDbConfigured(): boolean {
   return Boolean(
@@ -74,6 +74,32 @@ export async function ensureSchema(): Promise<void> {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS option_positions (
+        id SERIAL PRIMARY KEY,
+        deal_id INTEGER NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+        strategy_key TEXT NOT NULL,
+        ticker TEXT NOT NULL,
+        option_type TEXT NOT NULL,
+        side TEXT NOT NULL,
+        strike NUMERIC NOT NULL,
+        expiry DATE NOT NULL,
+        contracts INTEGER NOT NULL,
+        entry_premium_per_share NUMERIC NOT NULL,
+        entry_underlying_price NUMERIC NOT NULL,
+        opened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        status TEXT NOT NULL DEFAULT 'open',
+        exit_premium_per_share NUMERIC,
+        exit_underlying_price NUMERIC,
+        closed_at TIMESTAMPTZ,
+        iv_used NUMERIC,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS option_positions_deal_idx ON option_positions(deal_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS option_positions_status_idx ON option_positions(status)`;
     const { rows: companyCount } = await sql`SELECT COUNT(*)::int AS c FROM companies`;
     if (companyCount[0]?.c === 0) {
       for (const c of SEED_COMPANIES) {
@@ -108,6 +134,23 @@ export async function ensureSchema(): Promise<void> {
         `;
       }
       await sql`SELECT setval('deals_id_seq', (SELECT MAX(id) FROM deals))`;
+      for (const p of SEED_OPTION_POSITIONS) {
+        await sql`
+          INSERT INTO option_positions (
+            id, deal_id, strategy_key, ticker, option_type, side, strike, expiry,
+            contracts, entry_premium_per_share, entry_underlying_price,
+            opened_at, status, iv_used, notes, created_at, updated_at
+          ) VALUES (
+            ${p.id}, ${p.deal_id}, ${p.strategy_key}, ${p.ticker}, ${p.option_type},
+            ${p.side}, ${p.strike}, ${p.expiry}, ${p.contracts},
+            ${p.entry_premium_per_share}, ${p.entry_underlying_price},
+            ${p.opened_at}, ${p.status}, ${p.iv_used}, ${p.notes},
+            ${p.created_at}, ${p.updated_at}
+          )
+          ON CONFLICT (id) DO NOTHING
+        `;
+      }
+      await sql`SELECT setval('option_positions_id_seq', GREATEST((SELECT MAX(id) FROM option_positions), 1))`;
     }
   })().catch((err) => {
     schemaPromise = null;

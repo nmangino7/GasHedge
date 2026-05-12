@@ -90,3 +90,52 @@ export interface HedgingPlanCreateInput {
   custom_date?: string | null;
   rebalance_frequency: string;
 }
+
+export type OptionPositionStatus = "open" | "closed" | "expired";
+
+export interface OptionPositionRecord {
+  id: number;
+  deal_id: number;
+  company_id: number;
+  strategy_key: string; // e.g., "long_call", "covered_call", "collar:put_leg"
+  ticker: string;
+  option_type: "call" | "put";
+  side: "long" | "short";
+  strike: number;
+  expiry: string; // ISO date
+  contracts: number;
+  entry_premium_per_share: number;
+  entry_underlying_price: number;
+  opened_at: string;
+  status: OptionPositionStatus;
+  exit_premium_per_share: number | null;
+  exit_underlying_price: number | null;
+  closed_at: string | null;
+  iv_used: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OptionPositionCreateInput {
+  deal_id: number;
+  strategy_key: string;
+  ticker: string;
+  option_type: "call" | "put";
+  side: "long" | "short";
+  strike: number;
+  expiry: string;
+  contracts: number;
+  entry_premium_per_share: number;
+  entry_underlying_price: number;
+  iv_used?: number | null;
+  notes?: string | null;
+}
+
+export interface OptionPositionUpdateInput {
+  status?: OptionPositionStatus;
+  exit_premium_per_share?: number | null;
+  exit_underlying_price?: number | null;
+  closed_at?: string | null;
+  notes?: string | null;
+}

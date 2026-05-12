@@ -172,6 +172,155 @@ export const aiApi = {
     fetchJson<AIResponse>(`/ai/deep-report/${companyId}`, { method: "POST", timeoutMs: 120000 }),
 };
 
+// Option positions tracker
+export interface OptionPositionApi {
+  id: number;
+  deal_id: number;
+  company_id: number;
+  strategy_key: string;
+  ticker: string;
+  option_type: "call" | "put";
+  side: "long" | "short";
+  strike: number;
+  expiry: string;
+  contracts: number;
+  entry_premium_per_share: number;
+  entry_underlying_price: number;
+  opened_at: string;
+  status: "open" | "closed" | "expired";
+  exit_premium_per_share: number | null;
+  exit_underlying_price: number | null;
+  closed_at: string | null;
+  iv_used: number | null;
+  notes: string | null;
+}
+
+export interface LivePositionRow extends OptionPositionApi {
+  company_name: string;
+  live: {
+    current_underlying_price: number;
+    current_option_price_per_share: number;
+    current_total_value: number;
+    unrealized_pnl: number;
+    unrealized_pnl_pct: number;
+    days_to_expiry: number;
+    delta: number;
+    intrinsic_value_per_share: number;
+    time_value_per_share: number;
+    iv_used: number;
+    quote_stale: boolean;
+    quote_change_pct: number | null;
+  };
+}
+
+export interface LiveTrackerResponse {
+  positions: LivePositionRow[];
+  quotes: Record<string, { price: number; change: number; changePct: number; previousClose: number; asOf: string }>;
+  aggregate: {
+    open_count: number;
+    total_entry_cost: number;
+    total_current_value: number;
+    total_unrealized_pnl: number;
+    total_unrealized_pnl_pct: number;
+    tickers: string[];
+  };
+  quotes_error: string | null;
+  as_of: string;
+}
+
+export const positionsApi = {
+  list: (filter?: { dealId?: number; companyId?: number; status?: string }) => {
+    const params = new URLSearchParams();
+    if (filter?.dealId !== undefined) params.set("deal_id", String(filter.dealId));
+    if (filter?.companyId !== undefined) params.set("company_id", String(filter.companyId));
+    if (filter?.status) params.set("status", filter.status);
+    const qs = params.toString();
+    return fetchJson<{ positions: OptionPositionApi[] }>(`/positions${qs ? `?${qs}` : ""}`);
+  },
+  live: (filter?: { dealId?: number; companyId?: number }) => {
+    const params = new URLSearchParams();
+    if (filter?.dealId !== undefined) params.set("deal_id", String(filter.dealId));
+    if (filter?.companyId !== undefined) params.set("company_id", String(filter.companyId));
+    const qs = params.toString();
+    return fetchJson<LiveTrackerResponse>(`/positions/live${qs ? `?${qs}` : ""}`);
+  },
+  create: (data: {
+    deal_id: number;
+    strategy_key: string;
+    ticker: string;
+    option_type: "call" | "put";
+    side: "long" | "short";
+    strike: number;
+    expiry: string;
+    contracts: number;
+    entry_premium_per_share: number;
+    entry_underlying_price: number;
+    iv_used?: number;
+    notes?: string;
+  }) =>
+    fetchJson<{ position: OptionPositionApi }>("/positions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  close: (id: number, data: { exit_premium_per_share: number; exit_underlying_price: number; notes?: string }) =>
+    fetchJson<{ position: OptionPositionApi }>(`/positions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "closed", ...data }),
+    }),
+  remove: (id: number) =>
+    fetchJson<{ deleted: boolean }>(`/positions/${id}`, { method: "DELETE" }),
+};
+
+// ETF Options Strategies
+export interface EtfOptionLegApi {
+  side: "long" | "short";
+  option_type: "call" | "put";
+  strike: number;
+  premium_per_share: number;
+  contracts: number;
+  delta: number;
+  gamma: number;
+  theta_per_day: number;
+  vega: number;
+  iv_used: number;
+}
+export interface EtfOptionStrategyApi {
+  strategy_key: string;
+  display_name: string;
+  ticker: string;
+  expiry_days: number;
+  underlying_price: number;
+  contracts: number;
+  total_premium: number;
+  total_premium_label: string;
+  max_loss: number | string;
+  max_gain: number | string;
+  breakeven_etf_price: number | null;
+  net_delta: number;
+  hedge_fit: number;
+  shares_required?: number;
+  cash_required?: number;
+  legs: EtfOptionLegApi[];
+  description: string;
+  best_for: string;
+  rationale: string;
+}
+
+export const etfOptionsApi = {
+  forCompany: (companyId: number, hedgeRatio = 0.5) =>
+    fetchJson<{
+      company_id: number;
+      company_name: string;
+      fuel_type: string;
+      monthly_gallons: number;
+      current_fuel_price: number;
+      hedge_ratio: number;
+      etf_prices: Record<string, number>;
+      live_quotes_available: boolean;
+      strategies: EtfOptionStrategyApi[];
+    }>(`/hedging/etf-options/${companyId}?hedge_ratio=${hedgeRatio}`),
+};
+
 // Reports
 export const reportsApi = {
   detailed: (companyId: number, hedgeRatio = 0.5, ticker = "UGA") =>

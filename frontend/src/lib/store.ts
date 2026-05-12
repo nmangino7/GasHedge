@@ -1,5 +1,5 @@
 import { ensureSchema, isDbConfigured, sql } from "./db";
-import { SEED_COMPANIES, SEED_DEALS } from "./seed";
+import { SEED_COMPANIES, SEED_DEALS, SEED_OPTION_POSITIONS } from "./seed";
 import type {
   CompanyRecord,
   DealRecord,
@@ -7,6 +7,10 @@ import type {
   CompanyCreateInput,
   DealCreateInput,
   HedgingPlanCreateInput,
+  OptionPositionRecord,
+  OptionPositionCreateInput,
+  OptionPositionUpdateInput,
+  OptionPositionStatus,
 } from "./store-types";
 
 export type {
@@ -16,6 +20,10 @@ export type {
   CompanyCreateInput,
   DealCreateInput,
   HedgingPlanCreateInput,
+  OptionPositionRecord,
+  OptionPositionCreateInput,
+  OptionPositionUpdateInput,
+  OptionPositionStatus,
 };
 
 const STATE_TO_PADD: Record<string, string> = {
@@ -37,9 +45,11 @@ export function getPadd(state: string): string {
 const memCompanies: CompanyRecord[] = SEED_COMPANIES.map((c) => ({ ...c }));
 const memDeals: DealRecord[] = SEED_DEALS.map((d) => ({ ...d }));
 const memPlans: HedgingPlanRecord[] = [];
+const memPositions: OptionPositionRecord[] = SEED_OPTION_POSITIONS.map((p) => ({ ...p }));
 let nextCompanyId = Math.max(...memCompanies.map((c) => c.id), 0) + 1;
 let nextDealId = Math.max(...memDeals.map((d) => d.id), 0) + 1;
 let nextPlanId = 1;
+let nextPositionId = Math.max(...memPositions.map((p) => p.id), 0) + 1;
 
 type DbCompanyRow = {
   id: number;
@@ -483,6 +493,219 @@ export const hedgingPlanStore = {
     const idx = memPlans.findIndex((p) => p.id === id);
     if (idx === -1) return false;
     memPlans.splice(idx, 1);
+    return true;
+  },
+};
+
+// ---------- Option Positions ----------
+
+type DbOptionPositionRow = {
+  id: number;
+  deal_id: number;
+  strategy_key: string;
+  ticker: string;
+  option_type: string;
+  side: string;
+  strike: string | number;
+  expiry: Date | string;
+  contracts: number;
+  entry_premium_per_share: string | number;
+  entry_underlying_price: string | number;
+  opened_at: Date | string;
+  status: string;
+  exit_premium_per_share: string | number | null;
+  exit_underlying_price: string | number | null;
+  closed_at: Date | string | null;
+  iv_used: string | number | null;
+  notes: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+function mapPosition(r: DbOptionPositionRow, companyIdLookup: (dealId: number) => number | undefined): OptionPositionRecord {
+  return {
+    id: r.id,
+    deal_id: r.deal_id,
+    company_id: companyIdLookup(r.deal_id) ?? 0,
+    strategy_key: r.strategy_key,
+    ticker: r.ticker,
+    option_type: r.option_type as "call" | "put",
+    side: r.side as "long" | "short",
+    strike: numReq(r.strike),
+    expiry: typeof r.expiry === "string" ? r.expiry : r.expiry.toISOString().slice(0, 10),
+    contracts: r.contracts,
+    entry_premium_per_share: numReq(r.entry_premium_per_share),
+    entry_underlying_price: numReq(r.entry_underlying_price),
+    opened_at: iso(r.opened_at),
+    status: r.status as OptionPositionStatus,
+    exit_premium_per_share: num(r.exit_premium_per_share),
+    exit_underlying_price: num(r.exit_underlying_price),
+    closed_at: r.closed_at ? iso(r.closed_at) : null,
+    iv_used: num(r.iv_used),
+    notes: r.notes,
+    created_at: iso(r.created_at),
+    updated_at: iso(r.updated_at),
+  };
+}
+
+export const optionPositionStore = {
+  async list(filters: { dealId?: number; companyId?: number; status?: OptionPositionStatus } = {}): Promise<OptionPositionRecord[]> {
+    const { dealId, companyId, status } = filters;
+    if (isDbConfigured()) {
+      await ensureSchema();
+      let rows: DbOptionPositionRow[];
+      if (companyId !== undefined) {
+        if (status !== undefined) {
+          const result = await sql<DbOptionPositionRow & { company_id: number }>`
+            SELECT op.*, d.company_id FROM option_positions op
+            JOIN deals d ON d.id = op.deal_id
+            WHERE d.company_id = ${companyId} AND op.status = ${status}
+            ORDER BY op.opened_at DESC
+          `;
+          rows = result.rows;
+        } else {
+          const result = await sql<DbOptionPositionRow & { company_id: number }>`
+            SELECT op.*, d.company_id FROM option_positions op
+            JOIN deals d ON d.id = op.deal_id
+            WHERE d.company_id = ${companyId}
+            ORDER BY op.opened_at DESC
+          `;
+          rows = result.rows;
+        }
+      } else if (dealId !== undefined) {
+        if (status !== undefined) {
+          const result = await sql<DbOptionPositionRow>`SELECT * FROM option_positions WHERE deal_id = ${dealId} AND status = ${status} ORDER BY opened_at DESC`;
+          rows = result.rows;
+        } else {
+          const result = await sql<DbOptionPositionRow>`SELECT * FROM option_positions WHERE deal_id = ${dealId} ORDER BY opened_at DESC`;
+          rows = result.rows;
+        }
+      } else if (status !== undefined) {
+        const result = await sql<DbOptionPositionRow>`SELECT * FROM option_positions WHERE status = ${status} ORDER BY opened_at DESC`;
+        rows = result.rows;
+      } else {
+        const result = await sql<DbOptionPositionRow>`SELECT * FROM option_positions ORDER BY opened_at DESC`;
+        rows = result.rows;
+      }
+      // Build a deal_id -> company_id map for the rows we got
+      const dealIds = [...new Set(rows.map((r) => r.deal_id))];
+      const dealsMap = new Map<number, number>();
+      for (const did of dealIds) {
+        const d = await dealStore.get(did);
+        if (d) dealsMap.set(did, d.company_id);
+      }
+      return rows.map((r) => mapPosition(r, (id) => dealsMap.get(id)));
+    }
+    let result = [...memPositions];
+    if (dealId !== undefined) result = result.filter((p) => p.deal_id === dealId);
+    if (companyId !== undefined) {
+      const companyDealIds = new Set(memDeals.filter((d) => d.company_id === companyId).map((d) => d.id));
+      result = result.filter((p) => companyDealIds.has(p.deal_id));
+    }
+    if (status !== undefined) result = result.filter((p) => p.status === status);
+    return result.sort(
+      (a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()
+    );
+  },
+
+  async get(id: number): Promise<OptionPositionRecord | undefined> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbOptionPositionRow>`SELECT * FROM option_positions WHERE id = ${id}`;
+      if (!rows[0]) return undefined;
+      const deal = await dealStore.get(rows[0].deal_id);
+      return mapPosition(rows[0], () => deal?.company_id);
+    }
+    return memPositions.find((p) => p.id === id);
+  },
+
+  async create(data: OptionPositionCreateInput): Promise<OptionPositionRecord> {
+    const deal = await dealStore.get(data.deal_id);
+    if (!deal) throw new Error(`Deal ${data.deal_id} not found`);
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rows } = await sql<DbOptionPositionRow>`
+        INSERT INTO option_positions (
+          deal_id, strategy_key, ticker, option_type, side, strike, expiry,
+          contracts, entry_premium_per_share, entry_underlying_price,
+          status, iv_used, notes
+        ) VALUES (
+          ${data.deal_id}, ${data.strategy_key}, ${data.ticker}, ${data.option_type},
+          ${data.side}, ${data.strike}, ${data.expiry}, ${data.contracts},
+          ${data.entry_premium_per_share}, ${data.entry_underlying_price},
+          'open', ${data.iv_used ?? null}, ${data.notes ?? null}
+        ) RETURNING *
+      `;
+      return mapPosition(rows[0], () => deal.company_id);
+    }
+    const now = new Date().toISOString();
+    const position: OptionPositionRecord = {
+      id: nextPositionId++,
+      deal_id: data.deal_id,
+      company_id: deal.company_id,
+      strategy_key: data.strategy_key,
+      ticker: data.ticker,
+      option_type: data.option_type,
+      side: data.side,
+      strike: data.strike,
+      expiry: data.expiry,
+      contracts: data.contracts,
+      entry_premium_per_share: data.entry_premium_per_share,
+      entry_underlying_price: data.entry_underlying_price,
+      opened_at: now,
+      status: "open",
+      exit_premium_per_share: null,
+      exit_underlying_price: null,
+      closed_at: null,
+      iv_used: data.iv_used ?? null,
+      notes: data.notes ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    memPositions.push(position);
+    return position;
+  },
+
+  async update(id: number, data: OptionPositionUpdateInput): Promise<OptionPositionRecord | null> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const existing = await optionPositionStore.get(id);
+      if (!existing) return null;
+      const merged = { ...existing, ...data };
+      const { rows } = await sql<DbOptionPositionRow>`
+        UPDATE option_positions SET
+          status = ${merged.status},
+          exit_premium_per_share = ${merged.exit_premium_per_share},
+          exit_underlying_price = ${merged.exit_underlying_price},
+          closed_at = ${merged.closed_at},
+          notes = ${merged.notes},
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      if (!rows[0]) return null;
+      const deal = await dealStore.get(rows[0].deal_id);
+      return mapPosition(rows[0], () => deal?.company_id);
+    }
+    const idx = memPositions.findIndex((p) => p.id === id);
+    if (idx === -1) return null;
+    memPositions[idx] = {
+      ...memPositions[idx],
+      ...data,
+      updated_at: new Date().toISOString(),
+    };
+    return memPositions[idx];
+  },
+
+  async delete(id: number): Promise<boolean> {
+    if (isDbConfigured()) {
+      await ensureSchema();
+      const { rowCount } = await sql`DELETE FROM option_positions WHERE id = ${id}`;
+      return (rowCount ?? 0) > 0;
+    }
+    const idx = memPositions.findIndex((p) => p.id === id);
+    if (idx === -1) return false;
+    memPositions.splice(idx, 1);
     return true;
   },
 };
