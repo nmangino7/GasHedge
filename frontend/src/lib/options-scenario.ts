@@ -16,16 +16,24 @@ export interface ScenarioPoint {
   implied_fuel_price: number;
   /** % change in fuel from current */
   fuel_pct_change: number;
-  /** Unhedged annual fuel cost */
+  /** Unhedged annual fuel cost AT THIS scenario (= gallons × scenario_price × 12) */
   unhedged_annual_cost: number;
-  /** P&L on the option position at expiry (signed: positive = gain) */
+  /** P&L on the option legs alone at expiry (already net of premium paid) */
   option_payoff: number;
-  /** Hedged annual cost = unhedged - option payoff */
+  /** P&L on the underlying ETF position (zero for option-only strategies) */
+  etf_payoff: number;
+  /** Total hedge P&L = option_payoff + etf_payoff */
+  hedge_payoff: number;
+  /** Hedged annual cost AT THIS scenario = unhedged - hedge_payoff */
   hedged_annual_cost: number;
-  /** Savings vs unhedged-at-spot */
-  savings_vs_spot: number;
-  /** % savings */
-  savings_pct: number;
+  /** Value of the hedge AT THIS scenario = unhedged - hedged = hedge_payoff.
+   *  This is the intuitive "how much did the hedge save me?" number. */
+  hedge_value: number;
+  /** Net cost change vs TODAY's bill = hedged - current_annual_fuel_cost.
+   *  Negative = the client pays less than today. Positive = pays more. */
+  net_cost_vs_today: number;
+  /** % savings vs unhedged at this scenario */
+  hedge_pct: number;
 }
 
 export interface ScenarioResult {
@@ -39,14 +47,18 @@ export interface ScenarioResult {
   correlation: number;
   contracts: number;
   net_premium: number; // signed: positive = debit, negative = credit
+  /** How many ETF shares the strategy assumes the client holds (0 for option-only) */
+  shares_owned: number;
+  /** Total capital required = option premium + ETF shares cost */
+  capital_required: number;
   scenarios: ScenarioPoint[];
   /** Breakeven ETF price (where savings cross from negative to positive) */
   breakeven_etf_price: number | null;
   /** Breakeven retail fuel price */
   breakeven_fuel_price: number | null;
-  /** Worst-case savings (most negative — typically at low ETF prices) */
+  /** Worst-case hedge value — most-negative (hedge cost when bet doesn't pay off) */
   worst_case_savings: number;
-  /** Best-case savings */
+  /** Best-case hedge value — most-positive (hedge fully kicks in) */
   best_case_savings: number;
   /** Strategy max-loss exposure */
   max_loss: string;
@@ -101,18 +113,26 @@ export function buildScenarios(input: ScenarioInput): ScenarioResult {
   const spot = strategy.underlying_price;
   const currentAnnualFuelCost = monthlyGallons * 12 * currentFuelPrice;
 
+  // Strategies that require the client to own the ETF as the base hedge.
+  // For those, the scenario must include the ETF position's mark-to-market
+  // P&L on top of the option legs — otherwise the hedge looks backwards
+  // (e.g. a collar without the long-ETF leg appears to lose money when
+  // fuel rises, which is the opposite of how the hedge actually works).
+  const sharesOwned = strategy.shares_required ?? 0;
+
   const scenarios: ScenarioPoint[] = priceChanges.map((etfChange) => {
     const etfPrice = spot * (1 + etfChange);
-    // Implied retail fuel change scales by correlation:
-    // If ETF moves +20% and correlation is 0.88, retail moves ~17.6%.
     const fuelChange = etfChange * correlation;
     const impliedFuelPrice = currentFuelPrice * (1 + fuelChange);
     const unhedgedAnnualCost = monthlyGallons * 12 * impliedFuelPrice;
     const optionPayoff = strategyPayoffAtExpiry(strategy.legs, etfPrice);
-    const hedgedAnnualCost = unhedgedAnnualCost - optionPayoff;
-    const savingsVsSpot = currentAnnualFuelCost - hedgedAnnualCost;
-    const savingsPct =
-      currentAnnualFuelCost > 0 ? (savingsVsSpot / currentAnnualFuelCost) * 100 : 0;
+    const etfPayoff = sharesOwned * (etfPrice - spot);
+    const hedgePayoff = optionPayoff + etfPayoff;
+    const hedgedAnnualCost = unhedgedAnnualCost - hedgePayoff;
+    const hedgeValue = hedgePayoff;
+    const netCostVsToday = hedgedAnnualCost - currentAnnualFuelCost;
+    const hedgePct =
+      unhedgedAnnualCost > 0 ? (hedgeValue / unhedgedAnnualCost) * 100 : 0;
 
     return {
       etf_price: Math.round(etfPrice * 100) / 100,
@@ -120,25 +140,28 @@ export function buildScenarios(input: ScenarioInput): ScenarioResult {
       fuel_pct_change: Math.round(fuelChange * 10000) / 100,
       unhedged_annual_cost: Math.round(unhedgedAnnualCost),
       option_payoff: Math.round(optionPayoff),
+      etf_payoff: Math.round(etfPayoff),
+      hedge_payoff: Math.round(hedgePayoff),
       hedged_annual_cost: Math.round(hedgedAnnualCost),
-      savings_vs_spot: Math.round(savingsVsSpot),
-      savings_pct: Math.round(savingsPct * 10) / 10,
+      hedge_value: Math.round(hedgeValue),
+      net_cost_vs_today: Math.round(netCostVsToday),
+      hedge_pct: Math.round(hedgePct * 10) / 10,
     };
   });
 
-  // Find approximate breakeven (where savings crosses zero)
+  // Breakeven = the ETF price where the HEDGE VALUE flips from negative to
+  // positive. For long-call-style hedges this is roughly strike + premium.
   let breakevenEtfPrice: number | null = null;
   for (let i = 0; i < scenarios.length - 1; i++) {
     if (
-      (scenarios[i].savings_vs_spot < 0 && scenarios[i + 1].savings_vs_spot >= 0) ||
-      (scenarios[i].savings_vs_spot >= 0 && scenarios[i + 1].savings_vs_spot < 0)
+      (scenarios[i].hedge_value < 0 && scenarios[i + 1].hedge_value >= 0) ||
+      (scenarios[i].hedge_value >= 0 && scenarios[i + 1].hedge_value < 0)
     ) {
-      // Linear interpolate between the two ETF prices
       const a = scenarios[i];
       const b = scenarios[i + 1];
       const ratio =
-        Math.abs(a.savings_vs_spot) /
-        (Math.abs(a.savings_vs_spot) + Math.abs(b.savings_vs_spot));
+        Math.abs(a.hedge_value) /
+        (Math.abs(a.hedge_value) + Math.abs(b.hedge_value));
       breakevenEtfPrice = a.etf_price + (b.etf_price - a.etf_price) * ratio;
       break;
     }
@@ -147,8 +170,10 @@ export function buildScenarios(input: ScenarioInput): ScenarioResult {
     ? currentFuelPrice * (1 + ((breakevenEtfPrice - spot) / spot) * correlation)
     : null;
 
-  const worst = Math.min(...scenarios.map((s) => s.savings_vs_spot));
-  const best = Math.max(...scenarios.map((s) => s.savings_vs_spot));
+  // Worst-case = most-negative hedge value (hedge cost when fuel falls / hedge bet wrong)
+  // Best-case = most-positive hedge value (hedge fully kicks in)
+  const worst = Math.min(...scenarios.map((s) => s.hedge_value));
+  const best = Math.max(...scenarios.map((s) => s.hedge_value));
 
   return {
     strategy_key: strategy.strategy_key,
@@ -161,6 +186,8 @@ export function buildScenarios(input: ScenarioInput): ScenarioResult {
     correlation,
     contracts: strategy.contracts,
     net_premium: strategy.total_premium,
+    shares_owned: sharesOwned,
+    capital_required: Math.round(sharesOwned * spot + Math.max(0, strategy.total_premium)),
     scenarios,
     breakeven_etf_price: breakevenEtfPrice ? Math.round(breakevenEtfPrice * 100) / 100 : null,
     breakeven_fuel_price: breakevenFuelPrice ? Math.round(breakevenFuelPrice * 1000) / 1000 : null,

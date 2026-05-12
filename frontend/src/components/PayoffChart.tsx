@@ -18,8 +18,10 @@ interface ScenarioPoint {
   fuel_pct_change: number;
   unhedged_annual_cost: number;
   hedged_annual_cost: number;
-  savings_vs_spot: number;
+  hedge_value: number;
   option_payoff: number;
+  etf_payoff?: number;
+  hedge_payoff?: number;
 }
 
 interface Props {
@@ -86,8 +88,8 @@ export default function PayoffChart({
           }}
           formatter={(value, name) => {
             const n = typeof value === "number" ? value : Number(value);
-            if (name === "Savings") {
-              return [`${n >= 0 ? "+" : ""}$${n.toLocaleString()}`, "Savings"];
+            if (name === "Hedge value") {
+              return [`${n >= 0 ? "+" : ""}$${n.toLocaleString()}`, "Hedge value"];
             }
             return [`$${n.toLocaleString()}`, String(name)];
           }}
@@ -97,8 +99,8 @@ export default function PayoffChart({
 
         <Area
           type="monotone"
-          dataKey="savings_vs_spot"
-          name="Savings"
+          dataKey="hedge_value"
+          name="Hedge value"
           stroke="#0d8a4b"
           fill="url(#savingsGrad)"
           strokeWidth={2}

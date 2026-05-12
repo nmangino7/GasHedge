@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -22,9 +22,12 @@ interface ScenarioPoint {
   fuel_pct_change: number;
   unhedged_annual_cost: number;
   option_payoff: number;
+  etf_payoff: number;
+  hedge_payoff: number;
   hedged_annual_cost: number;
-  savings_vs_spot: number;
-  savings_pct: number;
+  hedge_value: number;
+  net_cost_vs_today: number;
+  hedge_pct: number;
 }
 
 interface StrategyOption {
@@ -63,6 +66,8 @@ interface ModelerResponse {
   monthly_gallons: number;
   correlation: number;
   net_premium: number;
+  shares_owned: number;
+  capital_required: number;
   scenarios: ScenarioPoint[];
   breakeven_etf_price: number | null;
   breakeven_fuel_price: number | null;
@@ -76,12 +81,15 @@ interface ModelerResponse {
 
 export default function ModelerPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const companyId = Number(params.companyId);
   const [data, setData] = useState<ModelerResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hedgeRatio, setHedgeRatio] = useState(0.5);
-  const [strategyKey, setStrategyKey] = useState<string>("collar");
+  const [strategyKey, setStrategyKey] = useState<string>(
+    searchParams.get("strategy") ?? "long_call"
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -316,6 +324,16 @@ export default function ModelerPage() {
         </p>
       </div>
 
+      {/* "Assumes ETF ownership" explainer */}
+      {data.shares_owned > 0 && (
+        <div className="surface p-4 mb-4" style={{ background: "var(--accent-tint)", borderColor: "var(--accent)" }}>
+          <p className="text-[12px] leading-relaxed" style={{ color: "var(--accent-lo)" }}>
+            <strong>This structure assumes the client owns {data.shares_owned.toLocaleString()} shares of {data.selected_strategy.ticker}.</strong>{" "}
+            That ETF holding (~${(data.shares_owned * spot_etf_price).toLocaleString()}) is the foundation of the hedge — when fuel rises, the ETF rises too. The option legs shape the payoff around that core position. The scenarios below include both the ETF and option P&amp;L.
+          </p>
+        </div>
+      )}
+
       {/* Scenario table */}
       <div className="surface mb-6" style={{ padding: 0, overflow: "hidden" }}>
         <div className="px-6 pt-5 pb-3 flex items-center justify-between">
@@ -332,48 +350,34 @@ export default function ModelerPage() {
                 <th className="right">Fuel Δ</th>
                 <th className="right">Retail $/gal</th>
                 <th className="right">Unhedged Cost</th>
-                <th className="right">Option P&amp;L</th>
+                {data.shares_owned > 0 && <th className="right">ETF P&amp;L</th>}
+                <th className="right">Options P&amp;L</th>
                 <th className="right">Hedged Cost</th>
-                <th className="right">Savings</th>
+                <th className="right" title="What the hedge gave back at this fuel price (Unhedged − Hedged)">Hedge Value</th>
               </tr>
             </thead>
             <tbody>
               {scenarios.map((s) => {
-                const isSpot =
-                  Math.abs(s.etf_price - spot_etf_price) < 0.5;
+                const isSpot = Math.abs(s.etf_price - spot_etf_price) < 0.5;
                 return (
-                  <tr
-                    key={s.etf_price}
-                    style={isSpot ? { background: "var(--accent-tint)", fontWeight: 600 } : undefined}
-                  >
+                  <tr key={s.etf_price} style={isSpot ? { background: "var(--accent-tint)", fontWeight: 600 } : undefined}>
                     <td className="num font-semibold">${s.etf_price.toFixed(2)}{isSpot && " · spot"}</td>
-                    <td
-                      className="right num font-semibold"
-                      style={{
-                        color: s.fuel_pct_change >= 0 ? "var(--negative)" : "var(--positive)",
-                      }}
-                    >
-                      {s.fuel_pct_change >= 0 ? "+" : ""}
-                      {s.fuel_pct_change.toFixed(1)}%
+                    <td className="right num font-semibold" style={{ color: s.fuel_pct_change >= 0 ? "var(--negative)" : "var(--positive)" }}>
+                      {s.fuel_pct_change >= 0 ? "+" : ""}{s.fuel_pct_change.toFixed(1)}%
                     </td>
                     <td className="right num">${s.implied_fuel_price.toFixed(3)}</td>
                     <td className="right num">${s.unhedged_annual_cost.toLocaleString()}</td>
-                    <td
-                      className="right num font-semibold"
-                      style={{
-                        color: s.option_payoff >= 0 ? "var(--positive)" : "var(--negative)",
-                      }}
-                    >
+                    {data.shares_owned > 0 && (
+                      <td className="right num font-semibold" style={{ color: s.etf_payoff >= 0 ? "var(--positive)" : "var(--negative)" }}>
+                        {s.etf_payoff >= 0 ? "+" : ""}${s.etf_payoff.toLocaleString()}
+                      </td>
+                    )}
+                    <td className="right num font-semibold" style={{ color: s.option_payoff >= 0 ? "var(--positive)" : "var(--negative)" }}>
                       {s.option_payoff >= 0 ? "+" : ""}${s.option_payoff.toLocaleString()}
                     </td>
                     <td className="right num">${s.hedged_annual_cost.toLocaleString()}</td>
-                    <td
-                      className="right num font-semibold"
-                      style={{
-                        color: s.savings_vs_spot >= 0 ? "var(--positive)" : "var(--negative)",
-                      }}
-                    >
-                      {s.savings_vs_spot >= 0 ? "+" : ""}${s.savings_vs_spot.toLocaleString()}
+                    <td className="right num font-semibold" style={{ color: s.hedge_value >= 0 ? "var(--positive)" : "var(--negative)" }}>
+                      {s.hedge_value >= 0 ? "+" : ""}${s.hedge_value.toLocaleString()}
                     </td>
                   </tr>
                 );
@@ -387,25 +391,25 @@ export default function ModelerPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <Takeaway
           icon={<TrendingUp className="h-4 w-4" />}
-          label="Best case"
+          label="Best case hedge value"
           value={`+$${best_case_savings.toLocaleString()}`}
-          sub="annual savings if fuel spikes to top of range"
+          sub="how much the hedge pays off if fuel spikes to top of range"
           color="var(--positive)"
         />
         <Takeaway
           icon={<TrendingDown className="h-4 w-4" />}
-          label="Worst case"
+          label="Worst case hedge cost"
           value={`${worst_case_savings >= 0 ? "+" : ""}$${worst_case_savings.toLocaleString()}`}
-          sub="annual P&L if fuel falls to bottom of range"
+          sub="hedge P&L if fuel falls (hedge bet doesn't pay off — premium lost)"
           color={worst_case_savings >= 0 ? "var(--positive)" : "var(--negative)"}
         />
         <Takeaway
           icon={<Target className="h-4 w-4" />}
-          label="Breakeven"
+          label="Breakeven fuel price"
           value={breakeven_fuel_price ? `$${breakeven_fuel_price.toFixed(3)}/gal` : "—"}
           sub={
             breakeven_etf_price
-              ? `ETF must reach $${breakeven_etf_price.toFixed(2)}`
+              ? `Above this price the hedge starts paying off · ETF ≥ $${breakeven_etf_price.toFixed(2)}`
               : "Strategy profits at any positive fuel-price move"
           }
           color="var(--accent-lo)"
@@ -426,19 +430,23 @@ export default function ModelerPage() {
             ({(correlation * 100).toFixed(0)}% for {selected_strategy.ticker}).
           </li>
           <li>
-            <strong>Unhedged cost:</strong> {monthly_gallons.toLocaleString()} gal/mo × 12 ×
-            implied retail price.
+            <strong>Unhedged annual cost:</strong> {monthly_gallons.toLocaleString()} gal/mo × 12 ×
+            implied retail price (what the client would pay with no hedge).
           </li>
           <li>
             <strong>Option payoff at expiry:</strong> per leg, (intrinsic value − entry premium) ×
             direction × 100 × contracts. Summed across all legs.
           </li>
+          {data.shares_owned > 0 && (
+            <li>
+              <strong>ETF position P&amp;L:</strong> {data.shares_owned.toLocaleString()} shares × (ETF price at expiry − spot). This is included because this strategy assumes the client owns the ETF as the base hedge.
+            </li>
+          )}
           <li>
-            <strong>Hedged cost:</strong> unhedged − option payoff.
+            <strong>Hedged annual cost:</strong> unhedged annual cost − total hedge P&amp;L (option legs{data.shares_owned > 0 ? " + ETF position" : ""}).
           </li>
           <li>
-            <strong>Savings:</strong> current annual cost at today&apos;s retail price minus the
-            hedged cost in that scenario.
+            <strong>Hedge value:</strong> the amount the hedge gives back in that scenario. Positive = hedge paid off; negative = hedge cost money (premium lost).
           </li>
         </ol>
         <Link

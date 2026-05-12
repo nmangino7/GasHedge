@@ -22,7 +22,11 @@ export async function GET(
 
     const url = new URL(req.url);
     const hedgeRatio = parseFloat(url.searchParams.get("hedge_ratio") || "0.5");
-    const strategyKey = url.searchParams.get("strategy") ?? "collar";
+    // Default to long_call — the most intuitive fuel hedge: ETF rises with fuel,
+    // so the long call pays off directly when fuel costs rise. Multi-leg
+    // strategies that assume ETF ownership (collar, covered call) are still
+    // selectable but include the underlying ETF P&L in the scenario math.
+    const strategyKey = url.searchParams.get("strategy") ?? "long_call";
 
     const fuelType = company.fuel_type === "diesel" ? "diesel" : "gasoline";
     const monthlyGallons =

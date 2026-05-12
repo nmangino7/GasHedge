@@ -154,7 +154,7 @@ export async function GET(
         <td class="right">$${fmtMoney(s.unhedged_annual_cost)}</td>
         <td class="right ${s.option_payoff >= 0 ? "pos" : "neg"}">${s.option_payoff >= 0 ? "+" : ""}$${fmtMoney(s.option_payoff)}</td>
         <td class="right">$${fmtMoney(s.hedged_annual_cost)}</td>
-        <td class="right ${s.savings_vs_spot >= 0 ? "pos" : "neg"}"><strong>${s.savings_vs_spot >= 0 ? "+" : ""}$${fmtMoney(s.savings_vs_spot)}</strong></td>
+        <td class="right ${s.hedge_value >= 0 ? "pos" : "neg"}"><strong>${s.hedge_value >= 0 ? "+" : ""}$${fmtMoney(s.hedge_value)}</strong></td>
       </tr>`;
       })
       .join("");
@@ -369,7 +369,7 @@ export async function GET(
   <p style="color:#5b6477;font-size:13px;margin:0 0 8px">We sweep the underlying ETF across a range from -30% to +60% and price the option payoff at each level.</p>
   ${chartSvg}
   <table>
-    <thead><tr><th>ETF</th><th>Fuel Δ</th><th>$/Gal</th><th class="right">Unhedged</th><th class="right">Option P&amp;L</th><th class="right">Hedged</th><th class="right">Savings</th></tr></thead>
+    <thead><tr><th>ETF</th><th>Fuel Δ</th><th>$/Gal</th><th class="right">Unhedged</th><th class="right">Option P&amp;L</th><th class="right">Hedged</th><th class="right">Hedge Value</th></tr></thead>
     <tbody>${optionScenarioRows}</tbody>
   </table>
   <div class="kpi-grid">
