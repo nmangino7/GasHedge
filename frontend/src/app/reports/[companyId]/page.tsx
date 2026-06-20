@@ -19,6 +19,7 @@ import {
   GitCompare,
   Zap,
   Sparkles,
+  Presentation,
 } from "lucide-react";
 
 interface DetailedReport {
@@ -134,11 +135,29 @@ export default function ReportsPage() {
             Comprehensive hedging deliverable · ready to print or share with the client
           </p>
         </div>
-        {report && (
-          <button onClick={downloadReport} className="btn btn-primary shrink-0">
-            <Download className="h-4 w-4" /> Download Report
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <a
+            href={`/api/reports/client-plan/${companyId}?coverage=${hedgeRatio}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost"
+            title="Branded client PDF (corrected numbers, print/save as PDF)"
+          >
+            <FileText className="h-4 w-4" /> Client PDF
+          </a>
+          <a
+            href={`/api/reports/deck/${companyId}?coverage=${hedgeRatio}`}
+            className="btn btn-ghost"
+            title="Download a branded PowerPoint client deck"
+          >
+            <Presentation className="h-4 w-4" /> PowerPoint deck
+          </a>
+          {report && (
+            <button onClick={downloadReport} className="btn btn-primary">
+              <Download className="h-4 w-4" /> Download Report
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Controls */}
