@@ -1,5 +1,7 @@
 import { dealStore, companyStore } from "@/lib/store";
 import { calculateDealRevenue } from "@/lib/hedging-engine";
+import { parseJson } from "@/api/validate";
+import { DealUpdateSchema } from "@/api/schemas/deal";
 
 export async function GET(
   _req: Request,
@@ -25,7 +27,9 @@ export async function PUT(
   if (!deal)
     return Response.json({ detail: "Deal not found" }, { status: 404 });
 
-  const data = await req.json();
+  const parsed = await parseJson(req, DealUpdateSchema);
+  if (!parsed.ok) return parsed.response;
+  const data: Record<string, unknown> = { ...parsed.data };
 
   if (
     data.fee_structure !== undefined ||
@@ -33,9 +37,9 @@ export async function PUT(
     data.aum_value !== undefined
   ) {
     data.annual_fee_revenue = calculateDealRevenue(
-      data.fee_structure ?? deal.fee_structure,
-      data.fee_amount ?? deal.fee_amount,
-      data.aum_value ?? deal.aum_value
+      (data.fee_structure as string) ?? deal.fee_structure,
+      (data.fee_amount as number) ?? deal.fee_amount,
+      (data.aum_value as number | null) ?? deal.aum_value
     );
   }
 

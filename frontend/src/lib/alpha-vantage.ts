@@ -1,5 +1,8 @@
-// Alpha Vantage API integration for real-time ETF prices
-// Env var: APLAG_1 (set in Vercel dashboard)
+// ETF price integration. Primary source is Yahoo Finance (no key required);
+// Alpha Vantage (env var APLAG_1) is an optional secondary; hardcoded defaults
+// are the last-resort fallback.
+
+import { getQuote, getMultipleQuotes } from "./yahoo-options";
 
 const AV_BASE = "https://www.alphavantage.co/query";
 
@@ -10,56 +13,62 @@ const DEFAULT_PRICES: Record<string, number> = {
   UNL: 8.0,
 };
 
-export async function getETFPrice(ticker: string): Promise<number> {
-  const apiKey = process.env.APLAG_1 || "";
-  if (!apiKey) {
-    console.warn("[AlphaVantage] No API key (APLAG_1) configured");
-    return DEFAULT_PRICES[ticker] || 50.0;
-  }
+const ETF_TICKERS = ["UGA", "USO", "BNO", "UNL"];
 
+export async function getETFPrice(ticker: string): Promise<number> {
+  // 1) Yahoo (keyless, live).
+  try {
+    const q = await getQuote(ticker);
+    if (q.price > 0) return q.price;
+  } catch {
+    /* fall through to Alpha Vantage / default */
+  }
+  // 2) Alpha Vantage (optional secondary).
+  const avPrice = await getETFPriceAlphaVantage(ticker);
+  if (avPrice != null) return avPrice;
+  // 3) Fallback.
+  return DEFAULT_PRICES[ticker] || 50.0;
+}
+
+async function getETFPriceAlphaVantage(ticker: string): Promise<number | null> {
+  const apiKey = process.env.APLAG_1 || "";
+  if (!apiKey) return null;
   try {
     const params = new URLSearchParams({
       function: "GLOBAL_QUOTE",
       symbol: ticker,
       apikey: apiKey,
     });
-
     const res = await fetch(`${AV_BASE}?${params}`, { cache: "no-store" });
-    if (!res.ok) {
-      console.error(`[AlphaVantage] API returned ${res.status}`);
-      return DEFAULT_PRICES[ticker] || 50.0;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
-
-    // Check for rate limit message
-    if (data["Note"] || data["Information"]) {
-      console.warn("[AlphaVantage] Rate limited:", data["Note"] || data["Information"]);
-      return DEFAULT_PRICES[ticker] || 50.0;
-    }
-
+    if (data["Note"] || data["Information"]) return null; // rate limited
     const quote = data["Global Quote"];
-    if (quote && quote["05. price"]) {
-      return parseFloat(quote["05. price"]);
-    }
-
-    console.warn(`[AlphaVantage] No quote data for ${ticker}`);
-    return DEFAULT_PRICES[ticker] || 50.0;
-  } catch (err) {
-    console.error(`[AlphaVantage] Error fetching ${ticker}:`, err);
-    return DEFAULT_PRICES[ticker] || 50.0;
+    if (quote && quote["05. price"]) return parseFloat(quote["05. price"]);
+    return null;
+  } catch {
+    return null;
   }
 }
 
 export async function getAllETFPrices(): Promise<Record<string, number>> {
-  const tickers = ["UGA", "USO", "BNO", "UNL"];
   const prices: Record<string, number> = {};
-
-  // Fetch sequentially to avoid rate limits (5 calls/min on free tier)
-  for (const ticker of tickers) {
-    prices[ticker] = await getETFPrice(ticker);
+  // 1) Yahoo batch (keyless, live) — fills what it can.
+  try {
+    const quotes = await getMultipleQuotes(ETF_TICKERS);
+    for (const t of ETF_TICKERS) {
+      const p = quotes[t]?.price;
+      if (p && p > 0) prices[t] = p;
+    }
+  } catch {
+    /* fall through */
   }
-
+  // 2) Backfill any gaps from Alpha Vantage (if keyed), else defaults.
+  for (const t of ETF_TICKERS) {
+    if (prices[t]) continue;
+    const av = await getETFPriceAlphaVantage(t);
+    prices[t] = av ?? DEFAULT_PRICES[t] ?? 50.0;
+  }
   return prices;
 }
 

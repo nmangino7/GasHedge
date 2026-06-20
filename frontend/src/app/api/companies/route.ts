@@ -1,4 +1,6 @@
 import { companyStore } from "@/lib/store";
+import { parseJson } from "@/api/validate";
+import { CompanyCreateSchema } from "@/api/schemas/company";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -8,7 +10,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const data = await req.json();
-  const company = await companyStore.create(data);
+  const parsed = await parseJson(req, CompanyCreateSchema);
+  if (!parsed.ok) return parsed.response;
+  const company = await companyStore.create(
+    parsed.data as Parameters<typeof companyStore.create>[0]
+  );
   return Response.json(company, { status: 201 });
 }

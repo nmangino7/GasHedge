@@ -101,4 +101,19 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
       required: ["companyId"],
     },
   },
+  {
+    name: "get_national_fuel_prices",
+    description:
+      "Get current U.S. national-average retail gasoline and diesel prices (no company needed). Use for market-outlook questions.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_etf_quote",
+    description: "Get the current price of a fuel ETF by ticker (UGA, USO, BNO, UNL).",
+    input_schema: {
+      type: "object",
+      properties: { ticker: { type: "string", description: "ETF ticker, e.g. UGA." } },
+      required: ["ticker"],
+    },
+  },
 ];

@@ -1,5 +1,7 @@
 import { dealStore, companyStore } from "@/lib/store";
 import { calculateDealRevenue } from "@/lib/hedging-engine";
+import { parseJson } from "@/api/validate";
+import { DealCreateSchema } from "@/api/schemas/deal";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -28,7 +30,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const data = await req.json();
+  const parsed = await parseJson(req, DealCreateSchema);
+  if (!parsed.ok) return parsed.response;
+  const data = parsed.data;
   const company = await companyStore.get(data.company_id);
   if (!company)
     return Response.json({ detail: "Company not found" }, { status: 404 });

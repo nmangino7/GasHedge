@@ -19,6 +19,7 @@ import { computeHedge, contractsForHedge } from "@/domain/finance/hedge-ratio";
 import { calculateExposure } from "@/domain/finance/exposure";
 import { runScenarios } from "@/domain/finance/scenarios";
 import { buildStrategy, StrategyKey } from "@/domain/finance/strategies";
+import { getFuelPrice, getEtfPrice } from "@/services/market-data";
 
 const companyId = z.object({ companyId: z.number() });
 
@@ -183,6 +184,21 @@ export async function runTool(name: string, rawInput: unknown): Promise<unknown>
         beta: ratio.beta,
         basisDriftPct,
       });
+    }
+    case "get_national_fuel_prices": {
+      const [g, d] = await Promise.all([
+        getFuelPrice("gasoline", "NUS"),
+        getFuelPrice("diesel", "NUS"),
+      ]);
+      return {
+        gasoline: { pricePerGallon: g.value, source: g.provenance.source, asOf: g.provenance.asOf },
+        diesel: { pricePerGallon: d.value, source: d.provenance.source, asOf: d.provenance.asOf },
+      };
+    }
+    case "get_etf_quote": {
+      const { ticker } = z.object({ ticker: z.string() }).parse(rawInput);
+      const p = await getEtfPrice(ticker);
+      return { ticker: ticker.toUpperCase(), price: p.value, source: p.provenance.source, asOf: p.provenance.asOf };
     }
     default:
       throw new ToolError(`Unknown tool: ${name}`);
