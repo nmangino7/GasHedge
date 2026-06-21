@@ -17,6 +17,7 @@ import {
 import { pricesApi, companiesApi, dealsApi, positionsApi } from "@/lib/api";
 import type { CurrentPrice, PricePoint } from "@/lib/types";
 import type { LiveTrackerResponse } from "@/lib/api";
+import DataStatusBar from "@/components/provenance/DataStatusBar";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
 
 type CompanyLite = {
@@ -149,6 +150,11 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* === Data provenance === */}
+      <div className="mb-6">
+        <DataStatusBar />
       </div>
 
       {/* === KPI strip === */}

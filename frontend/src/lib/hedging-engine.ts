@@ -1,14 +1,18 @@
+// v2: the legacy engine now delegates its math to the corrected, unit-tested
+// domain engine (src/domain/finance) while preserving these exported shapes, so
+// every existing route/page gets the fixed sizing & scenarios with no API churn.
+import { computeHedge, contractsForHedge } from "@/domain/finance/hedge-ratio";
+import { DEFAULT_FUEL_VOL } from "@/domain/finance/constants";
+import { runBacktest } from "@/domain/finance/backtest";
+
 export const CORRELATION: Record<string, Record<string, number>> = {
   gasoline: { UGA: 0.88, USO: 0.78, BNO: 0.75 },
   diesel: { USO: 0.8, BNO: 0.78, UGA: 0.65 },
 };
 
-const EXPENSE_RATIOS: Record<string, number> = {
-  UGA: 0.0097,
-  USO: 0.0081,
-  BNO: 0.009,
-  UNL: 0.009,
-};
+function fuelVolFor(fuelType: string): number {
+  return DEFAULT_FUEL_VOL[fuelType === "diesel" ? "diesel" : "gasoline"];
+}
 
 const ETF_NAMES: Record<string, string> = {
   UGA: "United States Gasoline Fund",
@@ -32,29 +36,31 @@ export function calculateHedgePosition(
   currentFuelPrice: number,
   currentEtfPrice: number
 ) {
-  const annualGallons = monthlyGallons * 12;
-  const gallonsToHedge = annualGallons * hedgeRatio;
-  const annualFuelCost = gallonsToHedge * currentFuelPrice;
-
   const correlation = (CORRELATION[fuelType] || {})[productTicker] || 0.8;
-  const adjustedNotional = annualFuelCost / correlation;
-  const sharesNeeded =
-    currentEtfPrice > 0 ? adjustedNotional / currentEtfPrice : 0;
-
-  const expenseRatio = EXPENSE_RATIOS[productTicker] || 0.01;
-  const annualExpenseDrag = adjustedNotional * expenseRatio;
+  // Corrected sizing via the minimum-variance hedge ratio (no more divide-by-ρ).
+  const { ratio, size } = computeHedge({
+    monthlyGallons,
+    coverageRatio: hedgeRatio,
+    currentFuelPrice,
+    etfPrice: currentEtfPrice,
+    ticker: productTicker,
+    correlation,
+    fuelVolatility: fuelVolFor(fuelType),
+    etfVolatility: getDefaultIV(productTicker),
+  });
 
   return {
     product_ticker: productTicker,
     product_name: ETF_NAMES[productTicker] || productTicker,
     hedge_ratio: hedgeRatio,
-    gallons_hedged: gallonsToHedge,
-    dollar_notional: Math.round(adjustedNotional * 100) / 100,
-    shares_needed: Math.round(sharesNeeded),
-    annual_expense_cost: Math.round(annualExpenseDrag * 100) / 100,
+    gallons_hedged: size.gallonsHedged,
+    dollar_notional: size.etfNotional,
+    shares_needed: size.sharesNeeded,
+    annual_expense_cost: size.annualExpenseDrag,
     correlation_to_retail: correlation,
-    effective_hedge_ratio:
-      Math.round(hedgeRatio * correlation * 1000) / 1000,
+    // Fraction of fuel-cost variance the hedge removes (ρ²) — the honest "effective" coverage.
+    effective_hedge_ratio: Math.round(ratio.hedgeEffectiveness * 1000) / 1000,
+    beta: Math.round(ratio.beta * 10000) / 10000,
     etf_price: currentEtfPrice,
   };
 }
@@ -72,8 +78,10 @@ export function scenarioAnalysis(
     const newPrice = currentFuelPrice * (1 + change);
     const unhedgedCost = annualGallons * newPrice;
 
-    const etfReturn = change * hedgePosition.correlation_to_retail;
-    const hedgePnl = hedgePosition.dollar_notional * etfReturn;
+    // Corrected: the hedge offsets the COVERED fuel-cost change (= shares × ΔetfPrice
+    // in expectation). With proper beta sizing this no longer makes correlation cancel
+    // against an inflated notional the way v1 did.
+    const hedgePnl = hedgePosition.gallons_hedged * currentFuelPrice * change;
     const hedgedCost =
       unhedgedCost - hedgePnl + hedgePosition.annual_expense_cost;
     const savings = unhedgedCost - hedgedCost;
@@ -167,7 +175,7 @@ export function detailedScenarioAnalysis(
   // At breakeven: notional * change * correlation = expenseCost
   // change = expenseCost / (notional * correlation)
   const breakevenChange = hedgePosition.annual_expense_cost /
-    (hedgePosition.dollar_notional * hedgePosition.correlation_to_retail);
+    (hedgePosition.gallons_hedged * currentFuelPrice);
   const breakevenPrice = Math.round(currentFuelPrice * (1 + breakevenChange) * 1000) / 1000;
 
   // Monthly projections at current price (no change scenario)
@@ -260,89 +268,36 @@ export function historicalBacktest(
   hedgeRatio: number,
   correlation: number
 ) {
-  if (!fuelPrices.length || !etfPrices.length) {
-    return {
-      periods: [],
-      total_unhedged_cost: 0,
-      total_hedged_cost: 0,
-      total_savings: 0,
-      savings_pct: 0,
-    };
-  }
-
-  const fuelMap = new Map(fuelPrices.map((p) => [p.period, p.value]));
-  const etfMap = new Map(etfPrices.map((p) => [p.period, p.value]));
-
-  const commonDates = [...new Set([...fuelMap.keys()].filter((d) => etfMap.has(d)))].sort();
-
-  if (commonDates.length < 2) {
-    return {
-      periods: [],
-      total_unhedged_cost: 0,
-      total_hedged_cost: 0,
-      total_savings: 0,
-      savings_pct: 0,
-    };
-  }
-
-  const weeklyGallons = monthlyGallons / 4.33;
-  const gallonsHedged = weeklyGallons * hedgeRatio;
-
-  const periods: {
-    date: string;
-    fuel_price: number;
-    etf_price: number;
-    unhedged_cost: number;
-    hedged_cost: number;
-    period_savings: number;
-    cumulative_savings: number;
-  }[] = [];
-  let totalUnhedged = 0;
-  let totalHedged = 0;
-  let cumulativeSavings = 0;
-
-  for (let i = 1; i < commonDates.length; i++) {
-    const d = commonDates[i];
-    const prevD = commonDates[i - 1];
-    const fuelPrice = fuelMap.get(d)!;
-    const etfPrice = etfMap.get(d)!;
-    const prevEtf = etfMap.get(prevD)!;
-
-    const unhedgedCost = weeklyGallons * fuelPrice;
-    const etfReturn = prevEtf > 0 ? (etfPrice - prevEtf) / prevEtf : 0;
-    const hedgePnl =
-      gallonsHedged * fuelMap.get(commonDates[0])! * correlation * etfReturn;
-    const hedgedCost = unhedgedCost - hedgePnl;
-    const savings = unhedgedCost - hedgedCost;
-    cumulativeSavings += savings;
-
-    totalUnhedged += unhedgedCost;
-    totalHedged += hedgedCost;
-
-    periods.push({
-      date: d,
-      fuel_price: Math.round(fuelPrice * 1000) / 1000,
-      etf_price: Math.round(etfPrice * 100) / 100,
-      unhedged_cost: Math.round(unhedgedCost * 100) / 100,
-      hedged_cost: Math.round(hedgedCost * 100) / 100,
-      period_savings: Math.round(savings * 100) / 100,
-      cumulative_savings: Math.round(cumulativeSavings * 100) / 100,
-    });
-  }
-
-  const totalSavings = totalUnhedged - totalHedged;
-  const savingsPct =
-    totalUnhedged > 0 ? (totalSavings / totalUnhedged) * 100 : 0;
+  // Delegate to the corrected domain backtest: a fixed ETF share count valued at
+  // each period's actual price (no correlation double-count). beta uses the
+  // supplied correlation as a sizing proxy; realized correlation is an output.
+  const out = runBacktest({
+    monthlyGallons,
+    coverageRatio: hedgeRatio,
+    beta: correlation,
+    fuelSeries: fuelPrices,
+    etfSeries: etfPrices,
+  });
 
   return {
-    periods,
-    total_unhedged_cost: Math.round(totalUnhedged * 100) / 100,
-    total_hedged_cost: Math.round(totalHedged * 100) / 100,
-    total_savings: Math.round(totalSavings * 100) / 100,
-    savings_pct: Math.round(savingsPct * 100) / 100,
-    period_count: periods.length,
-    start_date: commonDates[0],
-    end_date: commonDates[commonDates.length - 1],
+    periods: out.rows.map((r) => ({
+      date: r.date,
+      fuel_price: r.fuelPrice,
+      etf_price: r.etfPrice,
+      unhedged_cost: r.unhedgedCost,
+      hedged_cost: r.hedgedCost,
+      period_savings: r.etfPnl,
+      cumulative_savings: r.cumulativeSavings,
+    })),
+    total_unhedged_cost: out.totalUnhedged,
+    total_hedged_cost: out.totalHedged,
+    total_savings: out.totalSavings,
+    savings_pct: out.savingsPct,
+    period_count: out.periodCount,
+    start_date: out.startDate,
+    end_date: out.endDate,
+    realized_correlation: out.realizedCorrelation,
+    realized_hedge_effectiveness: out.realizedHedgeEffectiveness,
   };
 }
 
@@ -516,13 +471,18 @@ function notionalContractsForHedge(
   ticker: string,
   etfPrice: number
 ): number {
-  const annualGallons = monthlyGallons * 12;
-  const gallonsToHedge = annualGallons * hedgeRatio;
   const correlation = (CORRELATION[fuelType] || {})[ticker] || 0.8;
-  const annualFuelCost = gallonsToHedge * currentFuelPrice;
-  const adjustedNotional = annualFuelCost / correlation;
-  const sharesNeeded = etfPrice > 0 ? adjustedNotional / etfPrice : 0;
-  return Math.max(1, Math.round(sharesNeeded / 100));
+  const { size } = computeHedge({
+    monthlyGallons,
+    coverageRatio: hedgeRatio,
+    currentFuelPrice,
+    etfPrice,
+    ticker,
+    correlation,
+    fuelVolatility: fuelVolFor(fuelType),
+    etfVolatility: getDefaultIV(ticker),
+  });
+  return contractsForHedge(size);
 }
 
 function pricesAt(

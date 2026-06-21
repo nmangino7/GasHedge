@@ -1,20 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+// Compatibility shim — the AI implementation now lives in src/ai/*.
+// The legacy AI routes (ask/recommend/deep-report/market-outlook) import from
+// here; this re-exports the centralized client and the latest model so they all
+// use the current Claude generation rather than the pinned v1 model.
 
-// Check multiple possible env var names for the Anthropic API key
-export function getAnthropicApiKey(): string | null {
-  return (
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.CLAUDE_API_KEY ||
-    process.env.CLAUDE_KEY ||
-    null
-  );
-}
+export { getAnthropicApiKey, createAnthropicClient } from "@/ai/client";
+import { MODELS } from "@/ai/models";
 
-export function createAnthropicClient(): Anthropic | null {
-  const apiKey = getAnthropicApiKey();
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
-}
-
-// Use claude-sonnet-4-20250514 as the stable model ID
-export const AI_MODEL = "claude-sonnet-4-20250514";
+export const AI_MODEL: string = MODELS.sonnet;

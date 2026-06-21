@@ -144,44 +144,5 @@ export interface AIResponse {
   disclaimers: string[];
 }
 
-export interface OptionsStrategy {
-  approach: "options";
-  contracts_needed: number;
-  contract_size_gallons: number;
-  total_premium: number;
-  max_loss: number;
-  breakeven_price: number;
-  strike_price: number;
-  expiry_months: number;
-  license_required: "Series 3";
-  description: string;
-}
-
-export interface FuturesStrategy {
-  approach: "futures";
-  contracts_needed: number;
-  contract_size_gallons: number;
-  margin_per_contract: number;
-  total_margin_required: number;
-  notional_value: number;
-  correlation: number;
-  license_required: "Series 3";
-  description: string;
-}
-
-export interface AllStrategies {
-  etf: StrategyRecommendation[];
-  options: OptionsStrategy;
-  futures: FuturesStrategy;
-  comparison: {
-    approach: string;
-    annual_cost: number;
-    upfront_capital: number;
-    max_loss: string;
-    correlation: string;
-    liquidity: string;
-    complexity: string;
-    license: string;
-    best_for: string;
-  }[];
-}
+// (Removed dead FuturesStrategy / OptionsStrategy / AllStrategies "Series 3"
+// types — this platform is ETF + ETF-options only under Series 65/66.)

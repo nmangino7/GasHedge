@@ -364,7 +364,7 @@ export async function GET(
 
   <div class="step">
     <p style="margin:0"><span class="step-number">1</span><strong>Open the brokerage account</strong></p>
-    <p style="margin:8px 0 0;font-size:13px">Open a standard taxable brokerage account at <strong>${escapeHtml(brokerageLabel)}</strong>. Use the company&rsquo;s name and EIN. Process takes 1&ndash;3 business days. ${plan.approach !== "etf" ? "<strong>Note:</strong> options/futures require a Series 3 license &mdash; if the advisor doesn&rsquo;t hold one, the trades must be placed by a Series 3-licensed person." : ""}</p>
+    <p style="margin:8px 0 0;font-size:13px">Open a standard taxable brokerage account at <strong>${escapeHtml(brokerageLabel)}</strong>. Use the company&rsquo;s name and EIN. Process takes 1&ndash;3 business days. ${plan.approach !== "etf" ? "<strong>Note:</strong> the ETF options in this plan require Level 2 or Level 3 options approval on the account (a short application at the brokerage). These are listed equity options under Series 65/66 advisory scope &mdash; no commodity-futures (Series 3) license is involved. The client places the trades through their own brokerage." : ""}</p>
   </div>
 
   <div class="step">
