@@ -181,6 +181,21 @@ export async function GET(
       breakevenPrice = lc.breakeven_etf_price ?? etfPrice;
       upfrontCapital = lc.total_premium;
       annualHedgeCost = lc.total_premium;
+      // The label below is "Breakeven GASOLINE Price" — convert the option's
+      // ETF breakeven into the implied RETAIL FUEL price. The call pays for
+      // itself once the ETF reaches breakeven_etf_price; map that ETF move to a
+      // fuel move via the hedge beta (retail fuel moves less than the ETF).
+      const betaPos = calculateHedgePosition(
+        monthlyGallons,
+        fuelType,
+        plan.product_ticker,
+        plan.hedge_ratio,
+        fuelPrice,
+        etfPrice
+      );
+      const etfChangeToBreakeven =
+        etfPrice > 0 ? ((lc.breakeven_etf_price ?? etfPrice) - etfPrice) / etfPrice : 0;
+      breakevenPrice = fuelPrice * (1 + betaPos.beta * etfChangeToBreakeven);
       positionSummary = `Buy <strong>${lc.contracts} ${plan.product_ticker} call option contracts</strong> at $${(etfPrice).toFixed(2)} strike (ATM, ~120-day expiry). Total premium: <strong>$${fmtMoney(lc.total_premium)}</strong>. Max loss capped at premium. Series 65/66 advisory.`;
     } else {
       const pos = calculateHedgePosition(
